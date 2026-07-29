@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shadow AI Privacy Auditor</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="../icons/icon32.png" alt="" width="26" height="26">
+      <div>
+        <strong>Shadow AI Privacy Auditor</strong>
+        <span id="statusLine">Checking…</span>
+      </div>
+    </div>
+    <label class="switch" title="Turn monitoring on or off">
+      <input type="checkbox" id="enabled" checked>
+      <span></span>
+    </label>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="breakdown">
+    <h2>What has been caught</h2>
+    <div id="categories" class="bars"></div>
+  </section>
+
+  <section class="privacy">
+    <strong>Nothing you type is uploaded.</strong>
+    Detection runs entirely inside this browser. The counters above come from a
+    local log that stores category counts only — never your text and never a
+    detected value.
+  </section>
+
+  <footer>
+    <button id="btnOptions" class="btn">Policy settings</button>
+    <button id="btnClear" class="btn subtle">Clear log</button>
+  </footer>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

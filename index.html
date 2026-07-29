@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shadow AI Privacy Auditor — check your prompt before you paste it</title>
+<meta name="description" content="Find and redact sensitive information in text before sending it to ChatGPT, Gemini or Copilot. Runs entirely in your browser — nothing is uploaded.">
+<meta name="color-scheme" content="light dark">
+<!-- No third-party origins are permitted. This is the enforcement behind the "nothing leaves your browser" claim. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<link rel="stylesheet" href="./assets/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+
+<a class="skip-link" href="#editor">Skip to the text input</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2 4 5.5V11c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5.5Z"/>
+        <path d="m9 12 2 2 4-4"/>
+      </svg>
+    </span>
+    <div>
+      <h1>Shadow AI Privacy Auditor</h1>
+      <p class="tagline">Check what you are about to paste into a public AI assistant.</p>
+    </div>
+  </div>
+
+  <div class="topbar-actions">
+    <span class="offline-badge" id="offlineBadge" title="The scanner has no network permissions at all — see the Content-Security-Policy in the page source.">
+      <span class="dot" aria-hidden="true"></span> 100% on-device
+    </span>
+    <button class="btn ghost" id="btnPolicy" aria-expanded="false" aria-controls="policyPanel">Policy</button>
+    <button class="btn ghost" id="btnAudit" aria-expanded="false" aria-controls="auditPanel">Activity</button>
+    <button class="btn ghost icon" id="btnTheme" title="Toggle light / dark" aria-label="Toggle light or dark theme">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ------------------------------------------------------------ -->
+  <!-- LEFT: input + highlighted preview                              -->
+  <!-- ------------------------------------------------------------ -->
+  <section class="pane pane-input" aria-labelledby="inputHeading">
+    <div class="pane-head">
+      <h2 id="inputHeading">1 · Your text</h2>
+      <div class="pane-head-actions">
+        <label class="sr-only" for="sampleSelect">Load an example</label>
+        <select id="sampleSelect" class="select">
+          <option value="">Load an example…</option>
+        </select>
+        <button class="btn ghost small" id="btnClear">Clear</button>
+      </div>
+    </div>
+
+    <div class="editor-wrap">
+      <textarea id="editor" class="editor" spellcheck="false" autocomplete="off" autocorrect="off"
+        placeholder="Paste the prompt you were about to send to ChatGPT, Gemini or Copilot…
+
+Everything is analysed locally in this tab. Nothing is uploaded, logged or sent anywhere."></textarea>
+    </div>
+
+    <div class="editor-foot">
+      <span id="charCount" class="muted">0 characters</span>
+      <span class="muted" id="scanTime"></span>
+    </div>
+
+    <div class="pane-head sub">
+      <h2>Highlighted</h2>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="highlight-box" id="highlightBox" aria-live="polite">
+      <p class="empty">Highlighted text will appear here once you type or paste something.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ -->
+  <!-- RIGHT: verdict, findings, redacted output                      -->
+  <!-- ------------------------------------------------------------ -->
+  <section class="pane pane-results" aria-labelledby="resultsHeading">
+
+    <div class="verdict" id="verdict" data-band="safe">
+      <div class="gauge" id="gauge" role="img" aria-label="Risk score">
+        <svg viewBox="0 0 120 120" width="104" height="104">
+          <circle class="gauge-track" cx="60" cy="60" r="50"></circle>
+          <circle class="gauge-fill" id="gaugeFill" cx="60" cy="60" r="50"></circle>
+        </svg>
+        <div class="gauge-value"><strong id="scoreValue">0</strong><span>/100</span></div>
+      </div>
+      <div class="verdict-copy">
+        <h2 id="resultsHeading" class="verdict-headline">Paste something to get started</h2>
+        <p class="verdict-detail" id="verdictDetail">The auditor will tell you what is risky, why it matters, and give you a safe version to send instead.</p>
+        <ul class="chips" id="severityChips"></ul>
+      </div>
+    </div>
+
+    <div class="pane-head">
+      <h2>2 · Findings <span class="count" id="findingCount">0</span></h2>
+      <div class="pane-head-actions">
+        <button class="btn ghost small" id="btnRedactAll">Redact all</button>
+        <button class="btn ghost small" id="btnKeepAll">Keep all</button>
+      </div>
+    </div>
+
+    <div id="findings" class="findings">
+      <p class="empty">No findings yet.</p>
+    </div>
+
+    <div class="pane-head">
+      <h2>3 · Safe version</h2>
+      <div class="pane-head-actions">
+        <label class="sr-only" for="styleSelect">Redaction style</label>
+        <select id="styleSelect" class="select small">
+          <option value="numbered">[LABEL_1] — numbered</option>
+          <option value="label">[LABEL] — plain</option>
+          <option value="mask">Partial mask</option>
+          <option value="pseudonym">Realistic pseudonyms</option>
+        </select>
+        <button class="btn primary small" id="btnCopy">Copy safe text</button>
+      </div>
+    </div>
+
+    <div class="output-box">
+      <pre id="output" class="output"><span class="empty">The redacted version will appear here.</span></pre>
+    </div>
+    <p class="muted small" id="redactionSummary"></p>
+  </section>
+</main>
+
+<!-- ---------------------------------------------------------------- -->
+<!-- Policy drawer                                                     -->
+<!-- ---------------------------------------------------------------- -->
+<aside class="drawer" id="policyPanel" hidden aria-label="Detection policy">
+  <div class="drawer-head">
+    <h2>Detection policy</h2>
+    <button class="btn ghost icon" data-close-drawer aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <p class="muted small">Policies let an administrator ship one consistent configuration to a whole team. Everything is stored locally in this browser.</p>
+
+    <label class="field">
+      <span>Preset</span>
+      <select id="presetSelect" class="select"></select>
+    </label>
+
+    <fieldset class="field">
+      <legend>Categories scanned</legend>
+      <div id="categoryToggles" class="toggle-list"></div>
+    </fieldset>
+
+    <label class="field">
+      <span>Report findings above confidence <output id="reportOut"></output></span>
+      <input type="range" id="reportThreshold" min="0.1" max="0.9" step="0.05">
+    </label>
+
+    <label class="field">
+      <span>Auto-redact above confidence <output id="redactOut"></output></span>
+      <input type="range" id="redactThreshold" min="0.1" max="0.95" step="0.05">
+    </label>
+
+    <label class="field">
+      <span>Block sending at risk score <output id="blockOut"></output></span>
+      <input type="range" id="blockAtScore" min="10" max="101" step="1">
+      <small class="muted">Used by the browser extension. 101 = warn only, never block.</small>
+    </label>
+
+    <label class="field">
+      <span>Restricted internal terms <small class="muted">(one per line — project codenames, product names)</small></span>
+      <textarea id="customTerms" class="mono" rows="3" placeholder="Project Halberd&#10;Orchard release"></textarea>
+    </label>
+
+    <label class="field">
+      <span>Internal email domains <small class="muted">(one per line)</small></span>
+      <textarea id="internalDomains" class="mono" rows="2" placeholder="riverside-trust.invalid"></textarea>
+    </label>
+
+    <label class="field">
+      <span>Custom rules <small class="muted">(JSON array)</small></span>
+      <textarea id="customRules" class="mono" rows="5" placeholder='[{"label":"CASE_REF","pattern":"\\bCR-\\d{6}\\b","category":"people_records","severity":"high","title":"Case reference","why":"Identifies a live case file."}]'></textarea>
+      <small class="muted" id="customRulesStatus"></small>
+    </label>
+
+    <div class="drawer-actions">
+      <button class="btn primary small" id="btnApplyPolicy">Apply policy</button>
+      <button class="btn ghost small" id="btnExportPolicy">Export JSON</button>
+      <button class="btn ghost small" id="btnResetPolicy">Reset</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ---------------------------------------------------------------- -->
+<!-- Audit drawer                                                      -->
+<!-- ---------------------------------------------------------------- -->
+<aside class="drawer" id="auditPanel" hidden aria-label="Local activity log">
+  <div class="drawer-head">
+    <h2>Local activity log</h2>
+    <button class="btn ghost icon" data-close-drawer aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="callout">
+      <strong>This log stores counts, not content.</strong>
+      It records how many findings of each category and severity were seen, and nothing else — never the text you scanned and never a detected value. It lives in this browser only.
+    </div>
+    <div id="auditSummary" class="audit-summary"></div>
+    <div class="drawer-actions">
+      <button class="btn ghost small" id="btnExportAudit">Export CSV</button>
+      <button class="btn ghost small danger" id="btnClearAudit">Clear log</button>
+    </div>
+    <div id="auditList" class="audit-list"></div>
+  </div>
+</aside>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<footer class="footer">
+  <div>
+    <strong>How it works:</strong> checksum-validated pattern matching (Luhn, IBAN mod-97, Verhoeff, ABA), rule-based name and organisation recognition, and a context scorer that suppresses safe spans such as times, dates, versions and percentages.
+    <a href="./docs/DETECTION.md">Read the detection write-up →</a>
+  </div>
+  <div class="muted small">
+    Built for the CDF Shadow AI Hackathon. All examples in this project are fictional. No real personal, medical, financial, immigration, employee, volunteer or organisational data is used or stored.
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="./assets/app.js"></script>
+</body>
+</html>

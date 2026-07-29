@@ -1,0 +1,19 @@
+{
+  "name": "shadow-ai-privacy-auditor",
+  "version": "1.0.0",
+  "description": "Local-only privacy auditor that finds and redacts sensitive information in text before it is pasted into a public AI assistant. Web app + Chrome extension.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node tests/run.js",
+    "test:report": "node tests/run.js --write-report",
+    "bench": "node tests/bench.js",
+    "verify:offline": "node tools/verify-offline.mjs",
+    "build:extension": "node tools/build-extension.mjs",
+    "build": "npm run build:extension && npm run test:report",
+    "serve": "node tools/serve.mjs"
+  },
+  "keywords": ["privacy", "pii", "redaction", "dlp", "shadow-ai", "gdpr", "hipaa", "chrome-extension"]
+}
