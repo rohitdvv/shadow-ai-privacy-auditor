@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "Shadow AI Privacy Auditor",
+  "version": "1.2.0",
+  "description": "Warns you before you paste names, IDs, credentials, health data or confidential business information into a public AI assistant. Runs entirely on your device.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Shadow AI Privacy Auditor",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://m365.cloud.microsoft/*",
+        "https://www.bing.com/chat*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://poe.com/*",
+        "https://grok.com/*",
+        "https://chat.mistral.ai/*",
+        "https://huggingface.co/chat/*"
+      ],
+      "js": ["vendor/engine.bundle.js", "content/content.js"],
+      "css": ["content/content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'"
+  },
+  "host_permissions": []
+}

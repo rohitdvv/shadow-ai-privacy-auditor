@@ -30,4 +30,4 @@ jobs:
             || (echo "::error::extension/vendor/engine.bundle.js is stale — run 'npm run build:extension' and commit the result." && exit 1)
 
       - name: Validate extension manifest
-        run: node -e "const m=require('./extension/manifest.json');if(m.manifest_version!==3)throw new Error('expected MV3');if(m.host_permissions.length)throw new Error('extension must request no host permissions');console.log('manifest ok:',m.name,m.version)"
+        run: node -e "const m=require('./extension/manifest.json');if(m.manifest_version!==3)throw new Error('expected MV3');if(m.host_permissions.length)throw new Error('extension must request no host permissions');if(m.description.length>132)throw new Error('description exceeds the Chrome Web Store 132-char limit: '+m.description.length);console.log('manifest ok:',m.name,m.version,'· description',m.description.length+'/132')"
