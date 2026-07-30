@@ -1,6 +1,6 @@
 {
   "name": "shadow-ai-privacy-auditor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local-only privacy auditor that finds and redacts sensitive information in text before it is pasted into a public AI assistant. Web app + Chrome extension.",
   "type": "module",
   "private": true,

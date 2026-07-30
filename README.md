@@ -2,6 +2,8 @@
 
 **Check what you are about to paste into ChatGPT, Gemini or Copilot — before you paste it.**
 
+### ▶︎ [Try the live web app](https://rohitdvv.github.io/shadow-ai-privacy-auditor/) · [Download the extension](https://github.com/rohitdvv/shadow-ai-privacy-auditor/releases/latest)
+
 A local-only privacy auditor that finds sensitive information in text, explains why each item is risky, and produces a redacted version that is still useful to send. It ships as two things that share one detection engine:
 
 | | What it is | Where it runs |
@@ -16,7 +18,7 @@ A local-only privacy auditor that finds sensitive information in text, explains 
 ## Quick start
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/rohitdvv/shadow-ai-privacy-auditor
 cd shadow-ai-privacy-auditor
 
 npm run serve        # → http://localhost:4173
@@ -33,6 +35,21 @@ No dependencies. No build step for the web app — it is native ES modules and s
 2. Open `chrome://extensions`, enable **Developer mode**
 3. **Load unpacked** → select the `extension/` folder
 4. Open ChatGPT, Gemini, Claude, Copilot or Perplexity and start typing
+
+> The live web app has a one-click **"Get the extension"** installer with the same steps.
+
+---
+
+## In the web app
+
+- **Live risk gauge & verdict** — a 0–100 score with a plain-language "send / review / do not send" call, updated as you type.
+- **Per-finding explanations** — every hit shows the category, severity, confidence, the line it's on, and *why it matters*, with keep/redact toggles.
+- **Before ↔ After diff view** — see exactly which spans change, struck-through original beside each placeholder.
+- **Four redaction styles** — numbered `[LABEL_1]`, plain `[LABEL]`, partial mask, or realistic pseudonyms.
+- **Drag & drop / open file / paste from clipboard** — scan a `.txt`, `.md`, `.csv`, `.json`, `.env` or `.log` file entirely in-browser.
+- **Quick sensitivity switch** — Relaxed / Balanced / Strict in one click, plus a full policy editor (categories, thresholds, custom terms, internal domains, custom regex rules).
+- **Downloadable Markdown report** — findings metadata + the safe version (never the detected values).
+- **Content-free activity log**, light/dark themes, full keyboard shortcuts (`?` for the list), and accessible, responsive layout.
 
 ---
 

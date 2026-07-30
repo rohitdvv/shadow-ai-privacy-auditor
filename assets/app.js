@@ -26,6 +26,7 @@ const state = {
   redaction: null,
   activeId: null,
   style: 'numbered',
+  view: 'safe',           // 'safe' | 'diff'
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -35,8 +36,9 @@ const el = {
   verdict: $('#verdict'), gaugeFill: $('#gaugeFill'), scoreValue: $('#scoreValue'),
   headline: $('.verdict-headline'), detail: $('#verdictDetail'), chips: $('#severityChips'),
   findings: $('#findings'), findingCount: $('#findingCount'),
-  output: $('#output'), redactionSummary: $('#redactionSummary'),
+  output: $('#output'), redactionSummary: $('#redactionSummary'), btnReport: $('#btnReport'),
   sampleSelect: $('#sampleSelect'), styleSelect: $('#styleSelect'),
+  dropZone: $('#dropZone'), fileInput: $('#fileInput'),
   toast: $('#toast'), scrim: $('#scrim'),
 };
 
@@ -63,6 +65,110 @@ function recompute() {
   renderHighlights();
   renderFindings();
   renderVerdict();
+}
+
+/* ------------------------------------------------------------------ */
+/* input helpers: examples, clipboard, files                           */
+/* ------------------------------------------------------------------ */
+
+/** Load text into the editor and run a fresh scan. */
+function loadText(text) {
+  el.editor.value = text;
+  state.activeId = null;
+  render(scanNow(text));
+}
+
+/** Load a representative risky example (first hero CTA). */
+function loadRiskyExample() {
+  const preferred = ['R-13', 'R-10', 'R-01', 'R-11'];
+  const tc = preferred.map((id) => CASES.find((c) => c.id === id)).find(Boolean)
+    || CASES.find((c) => c.kind === 'risky');
+  if (tc) { loadText(tc.text); toast('Loaded an example — see the findings on the right'); }
+  el.editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) return toast('Clipboard is empty');
+    loadText(text);
+    toast('Pasted from clipboard');
+  } catch {
+    toast('Clipboard blocked — paste into the box with Ctrl+V');
+    el.editor.focus();
+  }
+}
+
+const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB is plenty for a prompt
+function handleFile(file) {
+  if (!file) return;
+  if (file.size > MAX_FILE_BYTES) return toast('File is too large (max 2 MB)');
+  const reader = new FileReader();
+  reader.onload = () => {
+    loadText(String(reader.result || ''));
+    toast(`Scanned ${file.name} locally`);
+  };
+  reader.onerror = () => toast('Could not read that file');
+  reader.readAsText(file);
+}
+
+/* ------------------------------------------------------------------ */
+/* quick preset (header segmented control)                             */
+/* ------------------------------------------------------------------ */
+
+function applyQuickPreset(key) {
+  state.policy = normalisePolicy(POLICY_PRESETS[key] || DEFAULT_POLICY);
+  savePolicy();
+  syncQuickPreset(key);
+  syncPolicyPanel();
+  render(scanNow(el.editor.value));
+  toast(`Sensitivity: ${key.charAt(0).toUpperCase()}${key.slice(1)}`);
+}
+
+/** Reflect the active preset in the header control (best-effort match by name). */
+function syncQuickPreset(key) {
+  let match = key;
+  if (!match) {
+    const name = state.policy.name || '';
+    match = /permissive/i.test(name) ? 'permissive' : /strict/i.test(name) ? 'strict' : 'balanced';
+  }
+  for (const b of document.querySelectorAll('#quickPreset button')) {
+    b.classList.toggle('is-on', b.dataset.preset === match);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* redaction report                                                    */
+/* ------------------------------------------------------------------ */
+
+function buildReport() {
+  const { risk, findings, stats } = state.result;
+  const r = state.redaction;
+  const lines = [];
+  lines.push('# Shadow AI Privacy Audit report', '');
+  lines.push(`- **Risk score:** ${risk.score}/100 (${risk.band.level})`);
+  lines.push(`- **Findings:** ${findings.length}`);
+  const sev = risk.counts;
+  lines.push(`- **By severity:** ${sev.critical} critical · ${sev.high} high · ${sev.medium} medium · ${sev.low} low`);
+  lines.push(`- **Scanned:** ${stats.characters.toLocaleString()} characters, ${stats.words.toLocaleString()} words in ${stats.durationMs} ms`);
+  lines.push('- **Where:** 100% in-browser. No text left this device.', '');
+  lines.push('> This report lists detection metadata only. Detected values are not written to the report.', '');
+  lines.push('## Findings', '');
+  if (!findings.length) {
+    lines.push('_No sensitive content detected._', '');
+  } else {
+    lines.push('| Category | Type | Severity | Confidence | Line |');
+    lines.push('| --- | --- | --- | --- | --- |');
+    for (const f of findings) {
+      const cat = CATEGORY_META[f.category]?.short || f.category;
+      lines.push(`| ${cat} | ${f.title} | ${f.severity} | ${(f.confidence * 100).toFixed(0)}% | ${f.line} |`);
+    }
+    lines.push('');
+  }
+  lines.push('## Safe version to send', '');
+  lines.push('```', r.text, '```', '');
+  lines.push(`_Generated by Shadow AI Privacy Auditor. ${r.changed ? `${r.replacements.length} item(s) redacted.` : 'Nothing needed redacting.'}_`);
+  return lines.join('\n');
 }
 
 /* ------------------------------------------------------------------ */
@@ -243,12 +349,17 @@ function renderOutput() {
   if (!state.result.stats.characters) {
     el.output.innerHTML = '<span class="empty">The redacted version will appear here.</span>';
     el.redactionSummary.textContent = '';
+    el.btnReport.hidden = true;
     return;
   }
-  const text = r.text;
-  // Highlight the placeholders so the change is obvious.
-  const html = escapeHtml(text).replace(/\[([A-Z_]+(?:_\d+)?)\]/g, '<span class="ph">[$1]</span>');
-  el.output.innerHTML = html || '<span class="empty">(empty)</span>';
+
+  if (state.view === 'diff') {
+    el.output.innerHTML = buildDiffHtml() || '<span class="empty">(empty)</span>';
+  } else {
+    // Highlight the placeholders so the change is obvious.
+    const html = escapeHtml(r.text).replace(/\[([A-Z_]+(?:_\d+)?)\]/g, '<span class="ph">[$1]</span>');
+    el.output.innerHTML = html || '<span class="empty">(empty)</span>';
+  }
 
   if (!r.changed) {
     el.redactionSummary.textContent = 'Nothing was changed — this text is safe to send exactly as written.';
@@ -256,6 +367,25 @@ function renderOutput() {
     const labels = [...new Set(r.replacements.map((x) => x.label))].join(', ');
     el.redactionSummary.textContent = `${r.replacements.length} replacement${r.replacements.length > 1 ? 's' : ''} made (${labels}). Everything else is byte-for-byte unchanged.`;
   }
+  el.btnReport.hidden = !state.result.findings.length;
+}
+
+/** Inline before/after view: struck-through original next to the placeholder. */
+function buildDiffHtml() {
+  const original = state.result.text;
+  const reps = [...state.redaction.replacements].sort((a, b) => a.start - b.start);
+  if (!reps.length) return escapeHtml(original);
+  let html = '';
+  let cursor = 0;
+  for (const rep of reps) {
+    if (rep.start < cursor) continue;
+    html += escapeHtml(original.slice(cursor, rep.start));
+    html += `<span class="del">${escapeHtml(original.slice(rep.start, rep.end))}</span>`;
+    html += `<span class="ins">${escapeHtml(rep.placeholder)}</span>`;
+    cursor = rep.end;
+  }
+  html += escapeHtml(original.slice(cursor));
+  return html;
 }
 
 function chip(severity) {
@@ -477,11 +607,34 @@ function wireEvents() {
   $('#btnAudit').addEventListener('click', () => { refreshAudit(); openDrawer('#auditPanel', '#btnAudit'); });
   for (const b of document.querySelectorAll('[data-close-drawer]')) b.addEventListener('click', closeDrawers);
   el.scrim.addEventListener('click', closeDrawers);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawers(); });
+
+  // modals
+  $('#btnGetExtension').addEventListener('click', () => openModal('#extModal'));
+  $('#btnShortcuts').addEventListener('click', () => openModal('#shortcutsModal'));
+  for (const b of document.querySelectorAll('[data-close-modal]')) b.addEventListener('click', closeOverlays);
+  for (const m of document.querySelectorAll('.modal')) {
+    m.addEventListener('click', (e) => { if (e.target === m) closeOverlays(); });
+  }
+  // install-method tabs inside the extension modal
+  for (const tab of document.querySelectorAll('.install-tabs button')) {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.install-tabs button').forEach((t) => {
+        const on = t === tab;
+        t.classList.toggle('is-on', on);
+        t.setAttribute('aria-selected', String(on));
+      });
+      document.querySelectorAll('.install-panel').forEach((p) => {
+        p.hidden = p.dataset.panel !== tab.dataset.tab;
+      });
+    });
+  }
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeOverlays(); });
 
   $('#presetSelect').addEventListener('change', (e) => {
     state.policy = normalisePolicy(POLICY_PRESETS[e.target.value] || DEFAULT_POLICY);
     syncPolicyPanel();
+    syncQuickPreset(e.target.value);
     savePolicy();
     render(scanNow(el.editor.value));
     toast(`Applied preset: ${state.policy.name}`);
@@ -490,6 +643,7 @@ function wireEvents() {
   $('#btnApplyPolicy').addEventListener('click', () => {
     state.policy = readPolicyPanel();
     savePolicy();
+    syncQuickPreset();
     render(scanNow(el.editor.value));
     toast('Policy applied');
   });
@@ -497,6 +651,7 @@ function wireEvents() {
   $('#btnResetPolicy').addEventListener('click', () => {
     state.policy = normalisePolicy(DEFAULT_POLICY);
     syncPolicyPanel();
+    syncQuickPreset('balanced');
     savePolicy();
     render(scanNow(el.editor.value));
     toast('Policy reset to defaults');
@@ -522,10 +677,63 @@ function wireEvents() {
     try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
   });
 
+  // hero CTAs
+  $('#btnTryExample').addEventListener('click', loadRiskyExample);
+  $('#btnPasteCheck').addEventListener('click', pasteFromClipboard);
+
+  // quick sensitivity presets
+  for (const b of document.querySelectorAll('#quickPreset button')) {
+    b.addEventListener('click', () => applyQuickPreset(b.dataset.preset));
+  }
+
+  // input tools: paste, open file, drag & drop
+  $('#btnPaste').addEventListener('click', pasteFromClipboard);
+  $('#btnLoadFile').addEventListener('click', () => el.fileInput.click());
+  el.fileInput.addEventListener('change', (e) => { handleFile(e.target.files[0]); e.target.value = ''; });
+
+  let dragDepth = 0;
+  el.dropZone.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; el.dropZone.classList.add('is-dragging'); });
+  el.dropZone.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  el.dropZone.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; el.dropZone.classList.remove('is-dragging'); } });
+  el.dropZone.addEventListener('drop', (e) => {
+    e.preventDefault(); dragDepth = 0; el.dropZone.classList.remove('is-dragging');
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+    else { const t = e.dataTransfer.getData('text'); if (t) loadText(t); }
+  });
+
+  // output view toggle (redacted vs diff)
+  for (const b of document.querySelectorAll('#viewToggle button')) {
+    b.addEventListener('click', () => {
+      state.view = b.dataset.view;
+      document.querySelectorAll('#viewToggle button').forEach((x) => x.classList.toggle('is-on', x === b));
+      renderOutput();
+    });
+  }
+
+  // download report
+  el.btnReport.addEventListener('click', () => {
+    if (!state.result?.findings.length) return;
+    download('shadow-ai-audit-report.md', buildReport(), 'text/markdown');
+    toast('Report downloaded');
+  });
+
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       $('#btnCopy').click();
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      el.editor.focus();
+      return;
+    }
+    // "?" opens shortcuts, but not while typing in a field
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+    if (e.key === '?' && !typing) {
+      e.preventDefault();
+      openModal('#shortcutsModal');
     }
   });
 }
@@ -543,6 +751,21 @@ function closeDrawers() {
   el.scrim.hidden = true;
   $('#btnPolicy').setAttribute('aria-expanded', 'false');
   $('#btnAudit').setAttribute('aria-expanded', 'false');
+}
+
+let lastFocused = null;
+function openModal(sel) {
+  closeOverlays();
+  lastFocused = document.activeElement;
+  const m = $(sel);
+  m.hidden = false;
+  m.querySelector('button, a, [tabindex]')?.focus();
+}
+function closeOverlays() {
+  closeDrawers();
+  for (const m of document.querySelectorAll('.modal')) m.hidden = true;
+  lastFocused?.focus?.();
+  lastFocused = null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -590,4 +813,5 @@ buildLegend();
 buildSamples();
 buildPolicyPanel();
 wireEvents();
+syncQuickPreset();
 render(scanNow(''));
