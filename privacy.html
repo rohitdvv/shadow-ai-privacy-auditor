@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Shadow AI Privacy Auditor</title>
+<meta name="description" content="Privacy policy for the Shadow AI Privacy Auditor web app and Chrome extension. Everything runs on your device; nothing is collected or transmitted.">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<style>
+  :root { --bg:#f4f6fb; --surface:#fff; --text:#14171e; --muted:#5d6673; --border:#e2e6ee; --accent:#2350e6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0c0f14; --surface:#14181f; --text:#e7eaef; --muted:#98a2b3; --border:#262d38; --accent:#6f9bff; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; line-height:1.6; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 3rem 1.4rem 5rem; }
+  a { color: var(--accent); }
+  h1 { font-size: 1.9rem; letter-spacing:-.02em; margin: 0 0 .3rem; }
+  h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+  .lede { color: var(--muted); margin-top: 0; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.4rem; margin-top:1.4rem; }
+  .tldr { border-left: 4px solid var(--accent); }
+  ul { padding-left: 1.2rem; }
+  li { margin: .35rem 0; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.9em; background:color-mix(in srgb, var(--text) 8%, transparent); padding:.05em .35em; border-radius:5px; }
+  .muted { color: var(--muted); font-size:.85rem; }
+  table { border-collapse: collapse; width:100%; margin-top:.6rem; font-size:.92rem; }
+  th, td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  .back { display:inline-block; margin-bottom:1.5rem; font-weight:600; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">← Shadow AI Privacy Auditor</a>
+  <h1>Privacy Policy</h1>
+  <p class="lede">Shadow AI Privacy Auditor — web app and Chrome extension. Last updated: 30 July 2026.</p>
+
+  <div class="card tldr">
+    <strong>In one sentence:</strong> this product collects nothing, transmits nothing, and has no servers. Everything happens on your device, and it is technically prevented from making network requests.
+  </div>
+
+  <h2>What we collect</h2>
+  <p><strong>Nothing.</strong> We operate no backend, no analytics, no accounts and no third-party services. The developer never receives your prompts, your findings, your settings, or any usage data.</p>
+
+  <h2>Where your text is processed</h2>
+  <p>All detection and redaction happens locally, inside your own browser tab (web app) or the extension's content script (extension). Your prompt text is <strong>never</strong> sent to a server, to the extension's background worker, or to the host page.</p>
+  <ul>
+    <li>The web app ships a <code>connect-src 'none'</code> Content-Security-Policy, so the browser itself blocks any outbound request.</li>
+    <li>The extension's manifest sets <code>connect-src 'none'</code> and requests <strong>zero host permissions</strong>, so it cannot transmit data even if a bug tried to.</li>
+    <li>A continuous integration check (<code>verify:offline</code>) fails the build if any shipped file contains <code>fetch</code>, <code>XMLHttpRequest</code>, <code>WebSocket</code>, <code>sendBeacon</code>, a remote import, or a remote asset reference.</li>
+  </ul>
+
+  <h2>What is stored on your device</h2>
+  <table>
+    <tr><th>Data</th><th>Where</th><th>Contains</th></tr>
+    <tr><td>Your policy / settings</td><td><code>chrome.storage.sync</code> (extension) / <code>localStorage</code> (web app)</td><td>Configuration only — enabled categories, thresholds, custom terms. Never prompt text.</td></tr>
+    <tr><td>Activity log</td><td><code>chrome.storage.local</code> (extension) / <code>localStorage</code> (web app)</td><td>Counts only — risk scores and how many findings per category/severity. Never the text you scanned and never a detected value.</td></tr>
+    <tr><td>Onboarding flag</td><td><code>chrome.storage.local</code></td><td>A single boolean so the welcome message shows once.</td></tr>
+  </table>
+  <p class="muted">This data never leaves your device and is never synced to us. You can clear it any time (extension options → Clear log, or your browser's site-data controls).</p>
+
+  <h2>Permissions the extension requests</h2>
+  <ul>
+    <li><code>storage</code> — to save your settings and the count-only activity log locally.</li>
+    <li>Content scripts on a fixed list of AI chat sites (ChatGPT, Claude, Gemini, Copilot, Perplexity and a few others) — to read the message box locally and warn you before you send. No <code>host_permissions</code>, no <code>tabs</code>, no <code>scripting</code>, no <code>webRequest</code>.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>The product is a general-purpose privacy tool and is not directed at children under 13.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the updated version will be posted at this URL with a new date.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or issues: open one on the <a href="https://github.com/rohitdvv/shadow-ai-privacy-auditor/issues" target="_blank" rel="noopener">GitHub repository</a>.</p>
+</div>
+</body>
+</html>

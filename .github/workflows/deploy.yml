@@ -34,7 +34,7 @@ jobs:
       - name: Package the site
         run: |
           mkdir -p _site
-          cp -r index.html assets engine tests docs README.md _site/
+          cp -r index.html privacy.html assets engine tests docs README.md _site/
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

@@ -60,17 +60,18 @@
     <div class="hero-copy">
       <span class="eyebrow"><span class="eyebrow-dot"></span> Privacy firewall for the copy-paste era</span>
       <h2 id="heroTitle">Stop leaking secrets to AI.<br><span class="grad">Check before you paste.</span></h2>
-      <p class="hero-sub">One in twenty prompts pasted into public chatbots contains a name, ID, password or confidential detail. This tool finds them in milliseconds, explains the risk, and hands you a safe version to send — <strong>without a single byte leaving your browser.</strong></p>
+      <p class="hero-sub">A name, a client's ID, a password, an API key — sensitive details slip into AI prompts every day, often without you noticing. This tool finds them in milliseconds, explains the risk, and hands you a safe version to send — <strong>without a single byte leaving your browser.</strong></p>
       <div class="hero-cta">
-        <button class="btn primary" id="btnTryExample">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9z"/></svg>
-          Try a risky example
+        <button class="btn primary" id="btnAddChrome">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 8h8.5M7.5 6.5 12 12M9.7 20.2 12 12"/></svg>
+          Add to Chrome — free
         </button>
-        <button class="btn outline" id="btnPasteCheck">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
-          Paste &amp; check clipboard
+        <button class="btn outline" id="btnTryExample">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9z"/></svg>
+          Try the live demo
         </button>
       </div>
+      <p class="hero-note">No sign-up. Nothing uploaded. Works on ChatGPT, Claude, Gemini, Copilot, Perplexity &amp; more. <button class="linklike" id="btnHowInstall">How do I install it? →</button></p>
     </div>
     <ul class="hero-stats" aria-label="At a glance">
       <li><strong>0</strong><span>network calls — ever</span></li>
@@ -151,6 +152,13 @@ Tip: drag a text file straight onto this box to scan it."></textarea>
   <!-- RIGHT: verdict, findings, redacted output                      -->
   <!-- ------------------------------------------------------------ -->
   <section class="pane pane-results" aria-labelledby="resultsHeading">
+
+    <div class="install-nudge" id="installNudge" hidden>
+      <div>
+        <strong>This is a demo.</strong> The extension does exactly this <em>automatically</em>, right inside ChatGPT, Claude &amp; Gemini — before you hit send.
+      </div>
+      <button class="btn primary small" id="btnNudgeInstall">Add to Chrome</button>
+    </div>
 
     <div class="verdict" id="verdict" data-band="safe">
       <div class="gauge" id="gauge" role="img" aria-label="Risk score">

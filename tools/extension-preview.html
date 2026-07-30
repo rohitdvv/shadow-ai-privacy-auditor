@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extension preview harness</title>
+<!--
+  DEV / DEMO HARNESS — not shipped to production, not part of the deployed site.
+
+  It stubs the `chrome.*` APIs and loads the REAL extension engine bundle and
+  content script over a neutral, generic AI-chat mock, so the extension's inline
+  UI (score pill, one-click Fix, review panel, onboarding) can be seen and
+  screenshotted without side-loading the unpacked extension into Chrome.
+
+  Run `npm run serve` and open /tools/extension-preview.html.
+-->
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f7f7f8; color: #1f2937;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 20px; border-bottom: 1px solid #ececf1; background: #fff;
+  }
+  .topbar .logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg,#10a37f,#0e8e6d); display: grid; place-items: center; color: #fff; font-weight: 700; }
+  .topbar b { font-size: 15px; }
+  .topbar .demo-tag { margin-left: 8px; font-size: 11px; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 999px; padding: 2px 8px; }
+  .thread { flex: 1; overflow: auto; padding: 28px 0; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+  .msg { display: flex; gap: 14px; margin-bottom: 26px; }
+  .avatar { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; }
+  .avatar.you { background: #6b7280; }
+  .avatar.ai { background: linear-gradient(135deg,#10a37f,#0e8e6d); }
+  .msg .body { font-size: 15px; line-height: 1.6; padding-top: 4px; }
+  .composer-area { border-top: 1px solid #ececf1; background: #fff; padding: 16px 20px 22px; }
+  .composer-box {
+    max-width: 760px; margin: 0 auto; position: relative;
+    border: 1px solid #d1d5db; border-radius: 26px; background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.05); padding: 12px 54px 12px 18px;
+  }
+  #composer {
+    min-height: 26px; max-height: 200px; overflow: auto; outline: none;
+    font-size: 16px; line-height: 1.5; color: #111827;
+  }
+  #composer:empty::before { content: attr(data-placeholder); color: #9ca3af; }
+  .send {
+    position: absolute; right: 10px; bottom: 10px;
+    width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer;
+    background: #111827; color: #fff; display: grid; place-items: center;
+  }
+  .send:disabled { background: #d1d5db; }
+  .hint { max-width: 760px; margin: 10px auto 0; font-size: 12px; color: #9ca3af; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="logo">A</span><b>AI Assistant</b>
+    <span class="demo-tag">preview harness · not a real chat service</span>
+  </div>
+
+  <div class="thread">
+    <div class="wrap">
+      <div class="msg">
+        <div class="avatar ai">AI</div>
+        <div class="body">Hi! Ask me anything. (This is a local mock used to preview the Shadow AI Privacy Auditor extension — nothing here is a real AI service.)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="composer-area">
+    <div class="composer-box">
+      <div id="composer" contenteditable="true" role="textbox" aria-label="Message"
+           data-placeholder="Message AI Assistant…"></div>
+      <button class="send" aria-label="Send" title="Send">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+      </button>
+    </div>
+    <p class="hint">Type a prompt with a name, email, SSN or API key — the extension's score pill appears above this box.</p>
+  </div>
+
+  <!-- 1) stub the chrome.* APIs the content script expects (dev only) -->
+  <script src="./preview-chrome-stub.js"></script>
+  <!-- 2) the REAL engine bundle → defines window.ShadowAI -->
+  <script src="../extension/vendor/engine.bundle.js"></script>
+  <!-- 3) the REAL content script → renders the pill / panel / onboarding -->
+  <script src="../extension/content/content.js"></script>
+  <!-- 4) optional screenshot driver (only acts when ?shot=… is present) -->
+  <script src="./preview-shot.js"></script>
+</body>
+</html>

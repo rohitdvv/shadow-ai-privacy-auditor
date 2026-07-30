@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Shadow AI Privacy Auditor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Warns you before you paste names, IDs, credentials, health data or confidential business information into a public AI assistant. Runs entirely on your device.",
   "minimum_chrome_version": "111",
   "permissions": ["storage"],

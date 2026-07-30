@@ -32,7 +32,10 @@
     bypassUntil: 0,
     panelOpen: false,
     pendingSend: null,
+    style: null,          // active redaction style in the panel (defaults to policy)
   };
+
+  const activeStyle = () => state.style || state.policy.redactionStyle;
 
   /* ------------------------------------------------------------------ */
   /* config                                                              */
@@ -147,7 +150,7 @@
       return;
     }
     state.result = ShadowAI.scan(text, { policy: state.policy });
-    state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: state.policy.redactionStyle });
+    state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
     ui.showPill(state.result, composer);
     badge(state.result.risk.band.level, state.result.findings.length);
     if (state.panelOpen) ui.renderPanel();
@@ -209,7 +212,7 @@
       const text = readComposer(e.target);
       if (text.trim()) {
         state.result = ShadowAI.scan(text, { policy: state.policy });
-        state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: state.policy.redactionStyle });
+        state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
       }
     }
     if (!shouldBlock()) return;
@@ -227,7 +230,7 @@
     const text = readComposer(state.composer);
     if (text.trim() && (!state.result || state.result.text !== text)) {
       state.result = ShadowAI.scan(text, { policy: state.policy });
-      state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: state.policy.redactionStyle });
+      state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
     }
     if (!shouldBlock()) return;
     e.preventDefault();
@@ -270,16 +273,59 @@
     document.documentElement.append(host);
 
     const pill = root.getElementById('pill');
+    const pillFix = root.getElementById('pillFix');
     const overlay = root.getElementById('overlay');
     const panel = root.getElementById('panel');
+    const styleSel = root.getElementById('styleSel');
+    const welcome = root.getElementById('welcome');
 
     pill.addEventListener('click', () => openPanel());
+
+    // One-click fix straight from the pill — redact in place, no panel needed.
+    pillFix.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!state.result || !state.composer) return;
+      const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
+      if (!redaction.changed) return;
+      writeComposer(state.composer, redaction.text);
+      state.redaction = redaction;
+      audit('redacted');
+      state.result = null;
+      pill.querySelector('.pill-text').textContent = `Cleaned — ${redaction.replacements.length} fixed`;
+      pill.dataset.band = 'safe';
+      pill.querySelector('.pill-score').textContent = '✓';
+      pillFix.hidden = true;
+    });
+
+    // Redaction style: let the user pick how values are replaced (incl. natural names).
+    styleSel.addEventListener('change', () => {
+      state.style = styleSel.value;
+      if (!state.result) return;
+      state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
+      root.getElementById('preview').textContent = state.redaction.text;
+    });
+
+    // First-run welcome — shown once, when the extension first sees a composer.
+    root.getElementById('welcomeX').addEventListener('click', dismissWelcome);
+    function dismissWelcome() {
+      welcome.hidden = true;
+      try { chrome.storage.local.set({ onboarded: true }); } catch { /* ignore */ }
+    }
+    function maybeWelcome() {
+      try {
+        chrome.storage.local.get(['onboarded'], (r) => {
+          if (chrome.runtime.lastError || r?.onboarded) return;
+          welcome.hidden = false;
+          setTimeout(() => { if (!welcome.hidden) dismissWelcome(); }, 12000);
+        });
+      } catch { /* ignore */ }
+    }
 
     root.getElementById('btnCancel').addEventListener('click', () => { audit('cancelled'); closePanel(); });
     overlay.addEventListener('click', (e) => { if (e.target === overlay) { audit('cancelled'); closePanel(); } });
 
     root.getElementById('btnRedact').addEventListener('click', () => {
-      const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: state.policy.redactionStyle });
+      const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
       writeComposer(state.composer, redaction.text);
       state.redaction = redaction;
       audit('redacted');
@@ -295,23 +341,28 @@
     });
 
     root.getElementById('btnCopyRedacted').addEventListener('click', async () => {
-      const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: state.policy.redactionStyle });
+      const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
       try { await navigator.clipboard.writeText(redaction.text); } catch { /* clipboard denied */ }
       const btn = root.getElementById('btnCopyRedacted');
       btn.textContent = 'Copied';
       setTimeout(() => { btn.textContent = 'Copy safe text'; }, 1600);
     });
 
+    let welcomed = false;
     function showPill(result, composer) {
       const { risk } = result;
+      const n = result.findings.length;
       pill.hidden = false;
       pill.dataset.band = risk.band.level;
+      pill.dataset.has = n > 0 ? '1' : '0';
       pill.querySelector('.pill-score').textContent = risk.score;
-      pill.querySelector('.pill-text').textContent = result.findings.length === 0
+      pill.querySelector('.pill-text').textContent = n === 0
         ? 'No sensitive data'
-        : `${result.findings.length} item${result.findings.length === 1 ? '' : 's'} to review`;
+        : `${n} item${n === 1 ? '' : 's'} to review`;
+      pillFix.hidden = n === 0;
       pill.title = `${risk.band.label} — ${risk.rationale.join(' ')}`;
       reposition(composer);
+      if (!welcomed) { welcomed = true; maybeWelcome(); }
     }
 
     function hidePill() { pill.hidden = true; }
@@ -331,6 +382,7 @@
       if (!state.result) return;
       state.panelOpen = true;
       overlay.hidden = false;
+      styleSel.value = activeStyle();
       renderPanel();
       root.getElementById('btnRedact').focus();
     }
@@ -362,7 +414,7 @@
         box.checked = f.redact;
         box.addEventListener('change', () => {
           f.redact = box.checked;
-          state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: state.policy.redactionStyle });
+          state.redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
           root.getElementById('preview').textContent = state.redaction.text;
         });
 
@@ -377,7 +429,7 @@
         list.append(row);
       }
 
-      const redaction = ShadowAI.redact(state.result.text, findings, { style: state.policy.redactionStyle });
+      const redaction = ShadowAI.redact(state.result.text, findings, { style: activeStyle() });
       root.getElementById('preview').textContent = redaction.text;
     }
 
@@ -425,7 +477,43 @@
   .pill[data-band="moderate"]  { --band: #ca8a04; }
   .pill[data-band="high"]      { --band: #ea580c; }
   .pill[data-band="critical"]  { --band: #b91c1c; }
+  .pill[data-has="1"] { border-color: var(--band); box-shadow: 0 4px 16px rgba(16,24,40,.16), 0 0 0 2px color-mix(in srgb, var(--band) 22%, transparent); }
+  .pill[data-band="critical"][data-has="1"] { animation: sa-pulse 2s ease-out infinite; }
+  @keyframes sa-pulse {
+    0%   { box-shadow: 0 4px 16px rgba(16,24,40,.16), 0 0 0 0 color-mix(in srgb, var(--band) 45%, transparent); }
+    70%  { box-shadow: 0 4px 16px rgba(16,24,40,.16), 0 0 0 8px transparent; }
+    100% { box-shadow: 0 4px 16px rgba(16,24,40,.16), 0 0 0 0 transparent; }
+  }
   .pill-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill-fix {
+    flex: 0 0 auto; margin-left: 2px;
+    font: inherit; font-size: 11.5px; font-weight: 700;
+    padding: 3px 10px; border-radius: 999px; cursor: pointer;
+    border: 0; background: var(--band, #b91c1c); color: #fff;
+  }
+  .pill-fix[hidden] { display: none; }
+  .pill-fix:hover { filter: brightness(1.08); }
+
+  .welcome {
+    position: fixed; z-index: 2147483645; left: 20px; bottom: 96px;
+    width: 300px; padding: 12px 14px 13px;
+    background: #fff; color: #16191f; border: 1px solid #dfe3e9;
+    border-left: 4px solid #1f4fd8; border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(16,24,40,.22);
+  }
+  .welcome[hidden] { display: none; }
+  .welcome-row { display: flex; align-items: center; gap: 8px; }
+  .welcome-mark { font-size: 16px; }
+  .welcome-row strong { font-size: 13.5px; }
+  .welcome-x { margin-left: auto; border: 0; background: none; cursor: pointer; color: #5d6673; font-size: 13px; padding: 2px 4px; }
+  .welcome p { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: #5d6673; }
+  .welcome p b { color: #16191f; }
+
+  .preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 5px; }
+  .style-sel {
+    font: inherit; font-size: 11.5px; padding: 3px 6px; border-radius: 7px;
+    border: 1px solid #c6ccd6; background: #fff; color: #16191f;
+  }
 
   .overlay {
     position: fixed; inset: 0; z-index: 2147483647;
@@ -504,6 +592,16 @@
 <div class="pill" id="pill" hidden>
   <span class="pill-score">0</span>
   <span class="pill-text">Checking…</span>
+  <button class="pill-fix" id="pillFix" hidden title="Replace the sensitive parts in place">Fix</button>
+</div>
+
+<div class="welcome" id="welcome" hidden>
+  <div class="welcome-row">
+    <span class="welcome-mark">🛡️</span>
+    <strong>Shadow AI is on</strong>
+    <button class="welcome-x" id="welcomeX" aria-label="Dismiss">✕</button>
+  </div>
+  <p>I'll check every prompt on this site <b>before</b> you send it — right here, on your device. Nothing is uploaded. Tap the score pill any time to review or clean up.</p>
 </div>
 
 <div class="overlay" id="overlay" hidden>
@@ -520,7 +618,15 @@
     <div class="list" id="list"></div>
 
     <div class="preview-wrap">
-      <h3>Safe version</h3>
+      <div class="preview-head">
+        <h3>Safe version</h3>
+        <select id="styleSel" class="style-sel" title="How to replace sensitive values">
+          <option value="numbered">Numbered — [NAME_1]</option>
+          <option value="label">Plain — [NAME]</option>
+          <option value="mask">Masked — J•••</option>
+          <option value="pseudonym">Natural names (reads normally)</option>
+        </select>
+      </div>
       <pre class="preview" id="preview"></pre>
     </div>
 

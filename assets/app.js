@@ -35,7 +35,7 @@ const el = {
   highlightBox: $('#highlightBox'), legend: $('#legend'),
   verdict: $('#verdict'), gaugeFill: $('#gaugeFill'), scoreValue: $('#scoreValue'),
   headline: $('.verdict-headline'), detail: $('#verdictDetail'), chips: $('#severityChips'),
-  findings: $('#findings'), findingCount: $('#findingCount'),
+  findings: $('#findings'), findingCount: $('#findingCount'), installNudge: $('#installNudge'),
   output: $('#output'), redactionSummary: $('#redactionSummary'), btnReport: $('#btnReport'),
   sampleSelect: $('#sampleSelect'), styleSelect: $('#styleSelect'),
   dropZone: $('#dropZone'), fileInput: $('#fileInput'),
@@ -245,6 +245,7 @@ function renderHighlights() {
 function renderFindings() {
   const { findings } = state.result;
   el.findingCount.textContent = findings.length;
+  el.installNudge.hidden = findings.length === 0;
 
   if (!findings.length) {
     el.findings.innerHTML = state.result.stats.characters
@@ -677,9 +678,11 @@ function wireEvents() {
     try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
   });
 
-  // hero CTAs
+  // hero CTAs — primary drives installs, secondary runs the demo
+  $('#btnAddChrome').addEventListener('click', () => openModal('#extModal'));
+  $('#btnHowInstall').addEventListener('click', () => openModal('#extModal'));
+  $('#btnNudgeInstall').addEventListener('click', () => openModal('#extModal'));
   $('#btnTryExample').addEventListener('click', loadRiskyExample);
-  $('#btnPasteCheck').addEventListener('click', pasteFromClipboard);
 
   // quick sensitivity presets
   for (const b of document.querySelectorAll('#quickPreset button')) {
