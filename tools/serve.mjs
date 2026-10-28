@@ -8,7 +8,7 @@
  */
 
 import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,13 +41,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const info = await stat(target).catch(() => null);
-    if (!info || info.isDirectory()) {
-      res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
-      return;
+    // Read directly instead of stat-then-read, which leaves a time-of-check /
+    // time-of-use gap. Missing files and directories both land in the catch.
+    let body;
+    try {
+      body = await readFile(target);
+    } catch (e) {
+      if (e.code === 'ENOENT' || e.code === 'EISDIR' || e.code === 'ENOTDIR') {
+        res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
+        return;
+      }
+      throw e;
     }
-
-    const body = await readFile(target);
     res.writeHead(200, {
       'content-type': TYPES[extname(target)] || 'application/octet-stream',
       'cache-control': 'no-store',

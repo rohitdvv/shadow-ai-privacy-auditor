@@ -93,6 +93,11 @@ function truncate(s, n = 60) {
   return s.length > n ? `${s.slice(0, n)}…` : s;
 }
 
+/** Escape for a Markdown table cell inside a code span: backslashes first, then pipes and backticks. */
+function mdCell(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/`/g, "'");
+}
+
 /* ------------------------------ run ------------------------------ */
 
 const selected = CASES.filter((tc) => !ONLY || ONLY.has(tc.id));
@@ -220,7 +225,7 @@ function buildReport() {
       lines.push('| Detected | Category | Severity | Confidence | Rule |');
       lines.push('| --- | --- | --- | --- | --- |');
       for (const f of r.result.findings) {
-        lines.push(`| \`${truncate(f.value.replace(/\n/g, ' ⏎ '), 44).replace(/\|/g, '\\|')}\` | ${CATEGORY_META[f.category]?.short} | ${f.severity} | ${f.confidence.toFixed(2)} | \`${f.ruleId}\` |`);
+        lines.push(`| \`${mdCell(truncate(f.value.replace(/\n/g, ' ⏎ '), 44))}\` | ${CATEGORY_META[f.category]?.short} | ${f.severity} | ${f.confidence.toFixed(2)} | \`${f.ruleId}\` |`);
       }
       lines.push('');
     } else {
