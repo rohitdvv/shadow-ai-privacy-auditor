@@ -1,0 +1,11 @@
+# The project has zero npm dependencies, so the only supply chain to watch is
+# the GitHub Actions used in CI. Dependabot updates the SHA pins weekly.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

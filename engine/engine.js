@@ -99,7 +99,7 @@ export function scan(text, options = {}) {
     truncated,
     findings,
     risk,
-    verdict: verdict(risk, policy),
+    verdict: truncated ? truncatedVerdict() : verdict(risk, policy),
     policy,
     stats: {
       characters: body.length,
@@ -183,6 +183,19 @@ function lineNumberAt(text, index) {
   return line;
 }
 
+/**
+ * Text beyond MAX_INPUT is never scanned, so a truncated result must not read
+ * as safe — otherwise padding a prompt would smuggle anything past the cap.
+ * Callers must also never write `result.text` back, as it is only the head.
+ */
+function truncatedVerdict() {
+  return {
+    headline: 'Too long to check completely',
+    detail: `Only the first ${MAX_INPUT.toLocaleString()} characters were scanned. Split the text into smaller pieces before sending.`,
+    action: 'block',
+  };
+}
+
 function emptyResult(body, policy, started, truncated) {
   const risk = scoreRisk([]);
   return {
@@ -190,7 +203,7 @@ function emptyResult(body, policy, started, truncated) {
     truncated,
     findings: [],
     risk,
-    verdict: verdict(risk, policy),
+    verdict: truncated ? truncatedVerdict() : verdict(risk, policy),
     policy,
     stats: {
       characters: body.length,

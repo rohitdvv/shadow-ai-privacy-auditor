@@ -30,21 +30,62 @@ export async function setEnabled(value) {
 }
 
 /**
+ * Enterprise policy pushed by an administrator through Chrome's managed storage
+ * (Google Admin console / Windows GPO / macOS profiles — see managed_schema.json).
+ * Read-only for the user, and delivered with zero network calls by the extension.
+ */
+export async function getManaged() {
+  try {
+    const { policy = null, forceEnabled = false } = await chrome.storage.managed.get(['policy', 'forceEnabled']);
+    return { policy: policy && typeof policy === 'object' ? policy : null, forceEnabled: forceEnabled === true };
+  } catch {
+    return { policy: null, forceEnabled: false };   // managed storage unavailable (unmanaged browser)
+  }
+}
+
+/** The config content scripts actually run with: a managed policy always wins. */
+export async function getEffectiveConfig() {
+  const managed = await getManaged();
+  return {
+    policy: managed.policy || (await getPolicy()),
+    enabled: managed.forceEnabled ? true : await isEnabled(),
+    managed: { policy: !!managed.policy, forceEnabled: managed.forceEnabled },
+  };
+}
+
+/* Audit entries come from content scripts running inside third-party pages, so
+   every field is coerced to a known shape before it is stored or rendered. */
+const BANDS = new Set(['safe', 'low', 'moderate', 'high', 'critical']);
+const ACTIONS = new Set(['scanned', 'redacted', 'sent-anyway', 'sent-clean', 'cancelled', 'blocked']);
+const CATEGORY_IDS = new Set(['contact', 'government_financial', 'credentials', 'medical_sensitive', 'people_records', 'org_confidential']);
+const SEVERITIES = ['critical', 'high', 'medium', 'low'];
+const count = (v, max = 100000) => {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? Math.min(n, max) : 0;
+};
+
+/**
  * Append an audit entry. Content is never stored — only counts, categories,
  * the risk score, the host and what the user chose to do.
  */
-export async function appendAudit(entry) {
+export async function appendAudit(entry = {}) {
   const { [LOG_KEY]: log = [] } = await chrome.storage.local.get(LOG_KEY);
+  const byCategory = {};
+  for (const [c, n] of Object.entries(entry.byCategory || {})) {
+    if (CATEGORY_IDS.has(c)) byCategory[c] = count(n);
+  }
+  const counts = {};
+  for (const s of SEVERITIES) counts[s] = count(entry.counts?.[s]);
   log.unshift({
     at: new Date().toISOString(),
-    host: entry.host || null,
-    score: entry.score ?? 0,
-    band: entry.band || 'safe',
-    counts: entry.counts || { critical: 0, high: 0, medium: 0, low: 0 },
-    byCategory: entry.byCategory || {},
-    totalFindings: entry.totalFindings ?? 0,
-    action: entry.action || 'scanned',
-    redactedCount: entry.redactedCount ?? 0,
+    host: typeof entry.host === 'string' ? entry.host.slice(0, 253) : null,
+    score: count(entry.score, 100),
+    band: BANDS.has(entry.band) ? entry.band : 'safe',
+    counts,
+    byCategory,
+    totalFindings: count(entry.totalFindings),
+    action: ACTIONS.has(entry.action) ? entry.action : 'scanned',
+    redactedCount: count(entry.redactedCount),
   });
   await chrome.storage.local.set({ [LOG_KEY]: log.slice(0, MAX_LOG) });
 }

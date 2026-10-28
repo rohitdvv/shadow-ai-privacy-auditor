@@ -3,7 +3,7 @@
  * run inside a plain web page for previewing / screenshots. Never shipped.
  */
 (function () {
-  const store = { local: {}, sync: {} };
+  const store = { local: {}, sync: {}, managed: {} };
   const mkArea = (name) => ({
     get(keys, cb) {
       const out = {};
@@ -13,6 +13,10 @@
     },
     set(obj, cb) { Object.assign(store[name], obj); cb && cb(); },
   });
+
+  // The content script uses a closed shadow root; it hands the root to this
+  // object only when it exists (which it never does in a real isolated world).
+  window.__SHADOW_AI_PREVIEW__ = {};
 
   window.chrome = {
     runtime: {
@@ -26,6 +30,7 @@
     storage: {
       local: mkArea('local'),
       sync: mkArea('sync'),
+      managed: mkArea('managed'),
       onChanged: { addListener() {} },
     },
   };

@@ -51,11 +51,11 @@
     });
   }
 
+  // Re-ask the worker rather than applying the change directly: it resolves the
+  // effective config, so an admin's managed policy always wins over user edits.
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'sync') return;
-    if (changes.policy) state.policy = ShadowAI.normalisePolicy(changes.policy.newValue || ShadowAI.DEFAULT_POLICY);
-    if (changes.enabled) state.enabled = changes.enabled.newValue !== false;
-    rescan();
+    if (area !== 'sync' && area !== 'managed') return;
+    if (changes.policy || changes.enabled || changes.forceEnabled) loadConfig();
   });
 
   /* ------------------------------------------------------------------ */
@@ -200,8 +200,15 @@
   function shouldBlock() {
     if (!state.enabled || !state.result) return false;
     if (Date.now() < state.bypassUntil) return false;
+    if (state.result.truncated) return true;   // the unscanned tail could hold anything
     return state.result.risk.score >= state.policy.blockAtScore && state.result.findings.length > 0;
   }
+
+  /**
+   * A truncated result's text is only the scanned head of the prompt. Writing
+   * it back would silently delete the rest, so every write path checks this.
+   */
+  const canRewrite = () => !!state.result && !state.result.truncated;
 
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
@@ -268,9 +275,14 @@
   const ui = (() => {
     const host = document.createElement('div');
     host.id = 'shadow-ai-auditor-root';
-    const root = host.attachShadow({ mode: 'open' });
+    // Closed, so the host page's scripts cannot read findings or click our
+    // buttons (e.g. "Send as written") through host.shadowRoot.
+    const root = host.attachShadow({ mode: 'closed' });
     root.innerHTML = TEMPLATE();
     document.documentElement.append(host);
+    // Dev preview harness only. In the real extension this script runs in an
+    // isolated world, so a page cannot define this global to get the root.
+    if (window.__SHADOW_AI_PREVIEW__) window.__SHADOW_AI_PREVIEW__.root = root;
 
     const pill = root.getElementById('pill');
     const pillFix = root.getElementById('pillFix');
@@ -284,7 +296,7 @@
     // One-click fix straight from the pill — redact in place, no panel needed.
     pillFix.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (!state.result || !state.composer) return;
+      if (!canRewrite() || !state.composer) { openPanel(); return; }
       const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
       if (!redaction.changed) return;
       writeComposer(state.composer, redaction.text);
@@ -325,6 +337,7 @@
     overlay.addEventListener('click', (e) => { if (e.target === overlay) { audit('cancelled'); closePanel(); } });
 
     root.getElementById('btnRedact').addEventListener('click', () => {
+      if (!canRewrite()) return;
       const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
       writeComposer(state.composer, redaction.text);
       state.redaction = redaction;
@@ -341,6 +354,7 @@
     });
 
     root.getElementById('btnCopyRedacted').addEventListener('click', async () => {
+      if (!canRewrite()) return;
       const redaction = ShadowAI.redact(state.result.text, state.result.findings, { style: activeStyle() });
       try { await navigator.clipboard.writeText(redaction.text); } catch { /* clipboard denied */ }
       const btn = root.getElementById('btnCopyRedacted');
@@ -356,10 +370,11 @@
       pill.dataset.band = risk.band.level;
       pill.dataset.has = n > 0 ? '1' : '0';
       pill.querySelector('.pill-score').textContent = risk.score;
-      pill.querySelector('.pill-text').textContent = n === 0
-        ? 'No sensitive data'
-        : `${n} item${n === 1 ? '' : 's'} to review`;
-      pillFix.hidden = n === 0;
+      pill.querySelector('.pill-text').textContent = result.truncated
+        ? 'Too long to check fully'
+        : n === 0 ? 'No sensitive data' : `${n} item${n === 1 ? '' : 's'} to review`;
+      if (result.truncated) { pill.dataset.band = 'critical'; pill.dataset.has = '1'; }
+      pillFix.hidden = n === 0 || result.truncated;
       pill.title = `${risk.band.label} — ${risk.rationale.join(' ')}`;
       reposition(composer);
       if (!welcomed) { welcomed = true; maybeWelcome(); }
@@ -400,6 +415,10 @@
       root.getElementById('panelDetail').textContent = state.result.verdict.detail;
       root.getElementById('panelHost').textContent = HOST || 'this site';
       root.getElementById('panelSite').hidden = !HOST;
+      // Rewriting a truncated result would drop the unscanned tail of the prompt.
+      root.getElementById('btnRedact').disabled = !canRewrite();
+      root.getElementById('btnCopyRedacted').disabled = !canRewrite();
+      if (state.result.truncated) panel.dataset.band = 'critical';
 
       const list = root.getElementById('list');
       list.replaceChildren();
@@ -584,6 +603,7 @@
   button:hover { background: #f2f4f7; }
   button.primary { background: #1f4fd8; border-color: #1f4fd8; color: #fff; }
   button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .45; cursor: not-allowed; filter: none; }
   button.subtle { border-color: transparent; color: #5d6673; }
   button.spacer { margin-left: auto; }
   .note { padding: 0 18px 14px; font-size: 11.5px; color: #5d6673; }

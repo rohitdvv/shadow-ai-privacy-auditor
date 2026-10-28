@@ -1,4 +1,4 @@
-import { isEnabled, setEnabled, readAudit, clearAudit, summarise } from '../shared/storage.js';
+import { isEnabled, setEnabled, readAudit, clearAudit, summarise, getManaged } from '../shared/storage.js';
 
 const CATEGORY_LABELS = {
   contact: ['Names & contact', '#2563eb'],
@@ -11,10 +11,16 @@ const CATEGORY_LABELS = {
 
 const $ = (s) => document.querySelector(s);
 
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 async function render() {
-  const enabled = await isEnabled();
+  const managed = await getManaged();
+  const enabled = managed.forceEnabled || await isEnabled();
   $('#enabled').checked = enabled;
-  $('#statusLine').textContent = enabled ? 'Monitoring active on AI chat sites' : 'Paused — nothing is being checked';
+  $('#enabled').disabled = managed.forceEnabled;
+  $('#statusLine').textContent = managed.forceEnabled
+    ? 'Always on — managed by your organisation'
+    : enabled ? 'Monitoring active on AI chat sites' : 'Paused — nothing is being checked';
 
   const log = await readAudit();
   const s = summarise(log);
@@ -35,7 +41,7 @@ async function render() {
   bars.innerHTML = entries.map(([cat, n]) => {
     const [label, colour] = CATEGORY_LABELS[cat] || [cat, '#5d6673'];
     const pct = max ? Math.round((n / max) * 100) : 0;
-    return `<div class="bar-row"><span>${label}</span><span>${n}</span>
+    return `<div class="bar-row"><span>${escapeHtml(label)}</span><span>${Number(n) || 0}</span>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${colour}"></div></div></div>`;
   }).join('');
 }

@@ -32,6 +32,10 @@ p { margin: 0 0 10px; }
 }
 .welcome strong { display: block; }
 .welcome[hidden] { display: none; }
+.welcome.managed {
+  background: color-mix(in srgb, #ca8a04 12%, transparent);
+  border-color: color-mix(in srgb, #ca8a04 34%, transparent);
+}
 
 main { max-width: 820px; margin: 0 auto; padding: 10px 20px; display: flex; flex-direction: column; gap: 14px; }
 

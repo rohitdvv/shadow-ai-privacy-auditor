@@ -41,7 +41,7 @@ const EXPORTED = [
   'scan', 'redact', 'segment', 'scoreRisk', 'verdict',
   'CATEGORIES', 'CATEGORY_META', 'CATEGORY_LIST', 'SEVERITY', 'SEVERITY_RANK',
   'SEVERITY_WEIGHT', 'RISK_BANDS', 'bandForScore',
-  'DEFAULT_POLICY', 'POLICY_PRESETS', 'normalisePolicy',
+  'DEFAULT_POLICY', 'POLICY_PRESETS', 'POLICY_LIMITS', 'normalisePolicy', 'checkPatternSafety',
   'RULES', 'RULES_BY_ID', 'extractEntities',
 ];
 

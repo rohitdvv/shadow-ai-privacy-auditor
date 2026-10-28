@@ -7,11 +7,11 @@
   const shot = new URLSearchParams(location.search).get('shot');
   if (!shot) return;
 
-  const PROMPT = 'Email John Carter at john.carter@acme.com, SSN 512-88-1044, and rotate the AWS key AKIA1234567890ABCD99.';
-  const sr = () => {
-    const root = document.getElementById('shadow-ai-auditor-root');
-    return root && root.shadowRoot;
-  };
+  // Fictional values. Not acme.com: that is a known placeholder domain the
+  // engine deliberately down-ranks, which would look like a miss in a screenshot.
+  const PROMPT = 'Email John Carter at john.carter84@gmail.com, SSN 512-88-1044, and rotate the AWS key AKIA1234567890ABCD99.';
+  // The extension's shadow root is closed; the dev stub receives it here.
+  const sr = () => window.__SHADOW_AI_PREVIEW__ && window.__SHADOW_AI_PREVIEW__.root;
 
   window.addEventListener('load', () => {
     const c = document.getElementById('composer');

@@ -34,7 +34,7 @@
 <div class="wrap">
   <a class="back" href="./">← Shadow AI Privacy Auditor</a>
   <h1>Privacy Policy</h1>
-  <p class="lede">Shadow AI Privacy Auditor — web app and Chrome extension. Last updated: 30 July 2026.</p>
+  <p class="lede">Shadow AI Privacy Auditor — web app and Chrome extension. Last updated: 27 October 2026.</p>
 
   <div class="card tldr">
     <strong>In one sentence:</strong> this product collects nothing, transmits nothing, and has no servers. Everything happens on your device, and it is technically prevented from making network requests.
@@ -57,6 +57,7 @@
     <tr><td>Your policy / settings</td><td><code>chrome.storage.sync</code> (extension) / <code>localStorage</code> (web app)</td><td>Configuration only — enabled categories, thresholds, custom terms. Never prompt text.</td></tr>
     <tr><td>Activity log</td><td><code>chrome.storage.local</code> (extension) / <code>localStorage</code> (web app)</td><td>Counts only — risk scores and how many findings per category/severity. Never the text you scanned and never a detected value.</td></tr>
     <tr><td>Onboarding flag</td><td><code>chrome.storage.local</code></td><td>A single boolean so the welcome message shows once.</td></tr>
+    <tr><td>Organisation policy (if any)</td><td><code>chrome.storage.managed</code> (read-only)</td><td>Detection settings an administrator deploys through the browser's enterprise management. Read locally; the extension sends nothing back.</td></tr>
   </table>
   <p class="muted">This data never leaves your device and is never synced to us. You can clear it any time (extension options → Clear log, or your browser's site-data controls).</p>
 

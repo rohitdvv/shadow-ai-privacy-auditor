@@ -79,6 +79,39 @@ export const POLICY_PRESETS = {
   },
 };
 
+/* Policies can arrive from an imported file, synced settings or an admin, so
+   every list is bounded — scanning runs on each keystroke inside the AI site. */
+export const POLICY_LIMITS = {
+  customRules: 50,
+  customTerms: 500,
+  termLength: 100,
+  internalDomains: 100,
+  patternLength: 256,
+};
+
+/**
+ * Reject regexes that can backtrack catastrophically (ReDoS). A running regex
+ * cannot be interrupted in JavaScript, so a pattern like `(a+)+$` would freeze
+ * the user's chat tab on every keystroke. Returns null when safe, else a reason.
+ */
+export function checkPatternSafety(pattern) {
+  if (typeof pattern !== 'string' || !pattern) return 'empty pattern';
+  if (pattern.length > POLICY_LIMITS.patternLength) return `longer than ${POLICY_LIMITS.patternLength} characters`;
+  if (/\\[1-9]|\\k</.test(pattern)) return 'backreferences are not allowed';
+  const quantifier = '(?:[+*]|\\{\\d+,\\d*\\})';
+  const groupBody = '(?:[^()\\\\]|\\\\.)*';
+  // A quantified group that itself contains a quantifier: (a+)+, (\w*)*, (x{1,}){2,}
+  if (new RegExp(`\\(${groupBody}${quantifier}${groupBody}\\)\\s*${quantifier}`).test(pattern)) {
+    return 'nested quantifiers can freeze the page';
+  }
+  // A quantified group of alternatives: (a|ab)*, (?:x|xy)+
+  if (new RegExp(`\\(${groupBody}\\|${groupBody}\\)\\s*${quantifier}`).test(pattern)) {
+    return 'repeated alternation can freeze the page';
+  }
+  try { new RegExp(pattern); } catch (e) { return `invalid: ${e.message}`; }
+  return null;
+}
+
 export function normalisePolicy(input) {
   const p = { ...DEFAULT_POLICY, ...(input || {}) };
   p.enabledCategories = Array.isArray(p.enabledCategories) && p.enabledCategories.length
@@ -86,12 +119,21 @@ export function normalisePolicy(input) {
     : [...DEFAULT_POLICY.enabledCategories];
   p.reportThreshold = clamp(p.reportThreshold, 0, 1);
   p.redactThreshold = clamp(Math.max(p.redactThreshold, p.reportThreshold), 0, 1);
-  p.customTerms = (p.customTerms || []).filter((t) => typeof t === 'string' && t.trim().length >= 3);
-  p.customRules = (p.customRules || []).filter((r) => r && r.pattern);
-  p.internalDomains = (p.internalDomains || []).map((d) => String(d).toLowerCase().replace(/^@/, ''));
+  p.customTerms = asArray(p.customTerms)
+    .filter((t) => typeof t === 'string' && t.trim().length >= 3 && t.length <= POLICY_LIMITS.termLength)
+    .slice(0, POLICY_LIMITS.customTerms);
+  p.customRules = asArray(p.customRules)
+    .filter((r) => r && !checkPatternSafety(r.pattern))
+    .slice(0, POLICY_LIMITS.customRules);
+  p.internalDomains = asArray(p.internalDomains)
+    .map((d) => String(d).toLowerCase().trim().replace(/^@/, ''))
+    .filter((d) => /^[a-z0-9.-]+\.[a-z0-9-]+$/.test(d))
+    .slice(0, POLICY_LIMITS.internalDomains);
   p.auditLog = { ...DEFAULT_POLICY.auditLog, ...(p.auditLog || {}) };
   return p;
 }
+
+const asArray = (v) => (Array.isArray(v) ? v : []);
 
 function clamp(n, lo, hi) {
   const v = Number(n);

@@ -9,7 +9,7 @@
  * It never sees prompt text. Content scripts send counts, not content.
  */
 
-import { getPolicy, isEnabled, appendAudit, readAudit, summarise } from './shared/storage.js';
+import { getEffectiveConfig, appendAudit, readAudit, summarise } from './shared/storage.js';
 
 const BADGE_COLOURS = {
   safe: '#15803d',
@@ -28,23 +28,30 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Only our own content scripts and pages may talk to the worker. (No
+  // externally_connectable is declared, but check anyway — defence in depth.)
+  if (sender.id !== chrome.runtime.id) {
+    sendResponse({ ok: false, error: 'forbidden' });
+    return false;
+  }
   (async () => {
     switch (message?.type) {
       case 'GET_CONFIG': {
-        sendResponse({ policy: await getPolicy(), enabled: await isEnabled() });
+        sendResponse(await getEffectiveConfig());
         return;
       }
       case 'AUDIT': {
-        await appendAudit({ ...message.entry, host: hostOf(sender) });
+        // The host comes from the browser, never from the (page-adjacent) payload.
+        await appendAudit({ ...(message.entry || {}), host: hostOf(sender) });
         sendResponse({ ok: true });
         return;
       }
       case 'BADGE': {
         const tabId = sender.tab?.id;
         if (tabId != null) {
-          const { band, count } = message;
-          await chrome.action.setBadgeText({ tabId, text: count ? String(count) : '' });
-          await chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE_COLOURS[band] || '#5d6673' });
+          const n = Math.min(Math.max(Math.floor(Number(message.count)) || 0, 0), 999);
+          await chrome.action.setBadgeText({ tabId, text: n ? String(n) : '' });
+          await chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE_COLOURS[message.band] || '#5d6673' });
         }
         sendResponse({ ok: true });
         return;

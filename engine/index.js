@@ -12,7 +12,7 @@ export {
   CATEGORIES, CATEGORY_META, CATEGORY_LIST, SEVERITY, SEVERITY_RANK,
   SEVERITY_WEIGHT, RISK_BANDS, bandForScore,
 } from './constants.js';
-export { DEFAULT_POLICY, POLICY_PRESETS, normalisePolicy } from './policy.js';
+export { DEFAULT_POLICY, POLICY_PRESETS, POLICY_LIMITS, normalisePolicy, checkPatternSafety } from './policy.js';
 export { RULES, RULES_BY_ID } from './patterns.js';
 export { extractEntities } from './ner.js';
 export { recordScan, readLog, clearLog, summariseLog, exportLogCsv } from './audit.js';

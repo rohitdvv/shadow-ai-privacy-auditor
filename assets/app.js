@@ -8,7 +8,7 @@
 import {
   scan, redact, segment,
   CATEGORY_META, CATEGORY_LIST, CATEGORIES,
-  DEFAULT_POLICY, POLICY_PRESETS, normalisePolicy,
+  DEFAULT_POLICY, POLICY_PRESETS, normalisePolicy, checkPatternSafety,
   recordScan, readLog, clearLog, summariseLog, exportLogCsv,
 } from '../engine/index.js';
 import { CASES } from '../tests/cases.js';
@@ -152,6 +152,9 @@ function buildReport() {
   lines.push(`- **By severity:** ${sev.critical} critical · ${sev.high} high · ${sev.medium} medium · ${sev.low} low`);
   lines.push(`- **Scanned:** ${stats.characters.toLocaleString()} characters, ${stats.words.toLocaleString()} words in ${stats.durationMs} ms`);
   lines.push('- **Where:** 100% in-browser. No text left this device.', '');
+  if (state.result.truncated) {
+    lines.push('> ⚠️ **Incomplete scan:** the text exceeded the scan limit, so only its first part was checked. The safe version below covers that part only.', '');
+  }
   lines.push('> This report lists detection metadata only. Detected values are not written to the report.', '');
   lines.push('## Findings', '');
   if (!findings.length) {
@@ -362,7 +365,10 @@ function renderOutput() {
     el.output.innerHTML = html || '<span class="empty">(empty)</span>';
   }
 
-  if (!r.changed) {
+  if (state.result.truncated) {
+    // The output holds only the scanned head; copying it would drop the rest.
+    el.redactionSummary.textContent = 'This text is too long to check completely — only the first part was scanned, so copying is disabled. Split it into smaller pieces.';
+  } else if (!r.changed) {
     el.redactionSummary.textContent = 'Nothing was changed — this text is safe to send exactly as written.';
   } else {
     const labels = [...new Set(r.replacements.map((x) => x.label))].join(', ');
@@ -481,8 +487,13 @@ function readPolicyPanel() {
     try {
       const parsed = JSON.parse(raw);
       customRules = Array.isArray(parsed) ? parsed : [parsed];
-      status.textContent = `${customRules.length} custom rule(s) loaded.`;
-      status.style.color = '';
+      const rejected = customRules
+        .map((r, i) => [i + 1, checkPatternSafety(r?.pattern)])
+        .filter(([, reason]) => reason);
+      status.textContent = rejected.length
+        ? `${customRules.length - rejected.length} rule(s) loaded · rejected: ${rejected.map(([i, why]) => `#${i} (${why})`).join(', ')}`
+        : `${customRules.length} custom rule(s) loaded.`;
+      status.style.color = rejected.length ? 'var(--danger)' : '';
     } catch (e) {
       status.textContent = `Could not parse JSON: ${e.message}`;
       status.style.color = 'var(--danger)';
@@ -533,7 +544,7 @@ function refreshAudit() {
   $('#auditList').replaceChildren(...log.slice(0, 25).map((e) => {
     const row = document.createElement('div');
     row.className = 'audit-row';
-    row.innerHTML = `<span>${new Date(e.at).toLocaleString()}</span><span>score ${e.score} · ${e.totalFindings} item(s)</span>`;
+    row.innerHTML = `<span>${escapeHtml(new Date(e.at).toLocaleString())}</span><span>score ${Number(e.score) || 0} · ${Number(e.totalFindings) || 0} item(s)</span>`;
     return row;
   }));
 }
@@ -578,6 +589,7 @@ function wireEvents() {
   $('#btnCopy').addEventListener('click', async () => {
     const text = state.redaction?.text ?? '';
     if (!text) return toast('Nothing to copy yet');
+    if (state.result?.truncated) return toast('Too long to check completely — split the text first');
     try {
       await navigator.clipboard.writeText(text);
     } catch {

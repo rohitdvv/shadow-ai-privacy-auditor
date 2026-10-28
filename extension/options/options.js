@@ -4,7 +4,7 @@
  * `ShadowAI` comes from the bundled engine loaded as a classic script.
  */
 
-import { getPolicy, setPolicy, readAudit, clearAudit, summarise, toCsv } from '../shared/storage.js';
+import { getPolicy, setPolicy, readAudit, clearAudit, summarise, toCsv, getManaged } from '../shared/storage.js';
 
 const $ = (s) => document.querySelector(s);
 const { CATEGORY_LIST, POLICY_PRESETS, DEFAULT_POLICY, normalisePolicy, scan, redact, CATEGORY_META } = ShadowAI;
@@ -18,7 +18,9 @@ init();
 async function init() {
   if (new URLSearchParams(location.search).get('welcome')) $('#welcome').hidden = false;
 
-  policy = normalisePolicy((await getPolicy()) || DEFAULT_POLICY);
+  const managed = await getManaged();
+  $('#managedNotice').hidden = !managed.policy;
+  policy = normalisePolicy(managed.policy || (await getPolicy()) || DEFAULT_POLICY);
 
   buildPresets();
   buildCategories();
@@ -93,8 +95,18 @@ function readForm() {
     try {
       const parsed = JSON.parse(raw);
       customRules = Array.isArray(parsed) ? parsed : [parsed];
-      status.textContent = `${customRules.length} custom rule(s) parsed.`;
-      status.style.color = '';
+      // Tell the admin which rules the engine will refuse, instead of dropping them silently.
+      const rejected = customRules
+        .map((r, i) => [i + 1, ShadowAI.checkPatternSafety(r?.pattern)])
+        .filter(([, reason]) => reason);
+      if (rejected.length) {
+        status.textContent = `${customRules.length - rejected.length} rule(s) OK · rejected: `
+          + rejected.map(([i, reason]) => `#${i} (${reason})`).join(', ');
+        status.style.color = 'var(--danger)';
+      } else {
+        status.textContent = `${customRules.length} custom rule(s) parsed.`;
+        status.style.color = '';
+      }
     } catch (err) {
       status.textContent = `Invalid JSON — ${err.message}`;
       status.style.color = 'var(--danger)';

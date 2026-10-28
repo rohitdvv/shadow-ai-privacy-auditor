@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "properties": {
+    "policy": {
+      "title": "Detection policy",
+      "description": "Organisation-wide detection policy. Same shape as the policy JSON exported from the options page. Overrides any user setting.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "enabledCategories": {
+          "description": "Any of: contact, government_financial, credentials, medical_sensitive, people_records, org_confidential.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reportThreshold": { "type": "number" },
+        "redactThreshold": { "type": "number" },
+        "blockAtScore": { "description": "Risk score (0-100) at which sending is paused. 101 = warn only.", "type": "integer" },
+        "redactionStyle": { "description": "numbered | label | mask | pseudonym", "type": "string" },
+        "customTerms": { "type": "array", "items": { "type": "string" } },
+        "internalDomains": { "type": "array", "items": { "type": "string" } },
+        "customRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "pattern": { "type": "string" },
+              "category": { "type": "string" },
+              "severity": { "type": "string" },
+              "title": { "type": "string" },
+              "why": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "forceEnabled": {
+      "title": "Keep the auditor always on",
+      "description": "When true, users cannot pause the auditor from the toolbar popup.",
+      "type": "boolean"
+    }
+  }
+}

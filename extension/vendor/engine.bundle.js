@@ -1341,6 +1341,19 @@
     'nairobi','lagos','cairo','johannesburg','dubai','singapore','manila','jakarta','bangkok','hanoi','dhaka',
   ]);
 
+  /**
+   * Imperatives and greetings that open a prompt right before a name — "Email
+   * John Carter", "Dear Priya Shah". They are trimmed off the front of a run, not
+   * used to reject it, so the name is still caught but redaction no longer eats
+   * the user's verb. None of these collide with the given-name gazetteer.
+   */
+  const LEADING_NON_NAME = setOf([
+    'email','call','ask','tell','text','message','ping','contact','invite','remind','reply','forward','notify',
+    'send','write','draft','compose','cc','bcc','dm','thank','thanks','dear','hi','hello','hey','please',
+    'introduce','meet','welcome','congratulate','schedule','book','summarize','summarise','explain',
+    'translate','rewrite','help','fix','check','find',
+  ]);
+
   /** Particles that can sit inside a multi-part surname. */
   const NAME_PARTICLES = setOf(['van','von','de','del','della','di','da','du','la','le','bin','binti','al','el','ibn','ter','ten','dos','das','af','av','mac','mc',"o'"]);
 
@@ -1377,7 +1390,7 @@
   function hasPersonCue(text, start, end) {
     const before = text.slice(Math.max(0, start - 45), start).toLowerCase();
     const after = text.slice(end, Math.min(text.length, end + 35)).toLowerCase();
-    const window = before + '   ' + after;
+    const window = before + ' \u0000 ' + after;
     return PERSON_CONTEXT_CUES.some((cue) => {
       if (cue.includes(' ')) return window.includes(cue);
       return new RegExp(`\\b${cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(window);
@@ -1408,7 +1421,8 @@
         if (j - i >= 4) break;
       }
 
-      const run = tokens.slice(i, j + 1);
+      let run = tokens.slice(i, j + 1);
+      while (run.length > 1 && LEADING_NON_NAME.has(run[0].lower)) run = run.slice(1);
       const start = run[0].start;
       const end = run[run.length - 1].end;
       const value = text.slice(start, end);
@@ -1733,6 +1747,39 @@
     },
   };
 
+  /* Policies can arrive from an imported file, synced settings or an admin, so
+     every list is bounded — scanning runs on each keystroke inside the AI site. */
+  const POLICY_LIMITS = {
+    customRules: 50,
+    customTerms: 500,
+    termLength: 100,
+    internalDomains: 100,
+    patternLength: 256,
+  };
+
+  /**
+   * Reject regexes that can backtrack catastrophically (ReDoS). A running regex
+   * cannot be interrupted in JavaScript, so a pattern like `(a+)+$` would freeze
+   * the user's chat tab on every keystroke. Returns null when safe, else a reason.
+   */
+  function checkPatternSafety(pattern) {
+    if (typeof pattern !== 'string' || !pattern) return 'empty pattern';
+    if (pattern.length > POLICY_LIMITS.patternLength) return `longer than ${POLICY_LIMITS.patternLength} characters`;
+    if (/\\[1-9]|\\k</.test(pattern)) return 'backreferences are not allowed';
+    const quantifier = '(?:[+*]|\\{\\d+,\\d*\\})';
+    const groupBody = '(?:[^()\\\\]|\\\\.)*';
+    // A quantified group that itself contains a quantifier: (a+)+, (\w*)*, (x{1,}){2,}
+    if (new RegExp(`\\(${groupBody}${quantifier}${groupBody}\\)\\s*${quantifier}`).test(pattern)) {
+      return 'nested quantifiers can freeze the page';
+    }
+    // A quantified group of alternatives: (a|ab)*, (?:x|xy)+
+    if (new RegExp(`\\(${groupBody}\\|${groupBody}\\)\\s*${quantifier}`).test(pattern)) {
+      return 'repeated alternation can freeze the page';
+    }
+    try { new RegExp(pattern); } catch (e) { return `invalid: ${e.message}`; }
+    return null;
+  }
+
   function normalisePolicy(input) {
     const p = { ...DEFAULT_POLICY, ...(input || {}) };
     p.enabledCategories = Array.isArray(p.enabledCategories) && p.enabledCategories.length
@@ -1740,12 +1787,21 @@
       : [...DEFAULT_POLICY.enabledCategories];
     p.reportThreshold = clamp(p.reportThreshold, 0, 1);
     p.redactThreshold = clamp(Math.max(p.redactThreshold, p.reportThreshold), 0, 1);
-    p.customTerms = (p.customTerms || []).filter((t) => typeof t === 'string' && t.trim().length >= 3);
-    p.customRules = (p.customRules || []).filter((r) => r && r.pattern);
-    p.internalDomains = (p.internalDomains || []).map((d) => String(d).toLowerCase().replace(/^@/, ''));
+    p.customTerms = asArray(p.customTerms)
+      .filter((t) => typeof t === 'string' && t.trim().length >= 3 && t.length <= POLICY_LIMITS.termLength)
+      .slice(0, POLICY_LIMITS.customTerms);
+    p.customRules = asArray(p.customRules)
+      .filter((r) => r && !checkPatternSafety(r.pattern))
+      .slice(0, POLICY_LIMITS.customRules);
+    p.internalDomains = asArray(p.internalDomains)
+      .map((d) => String(d).toLowerCase().trim().replace(/^@/, ''))
+      .filter((d) => /^[a-z0-9.-]+\.[a-z0-9-]+$/.test(d))
+      .slice(0, POLICY_LIMITS.internalDomains);
     p.auditLog = { ...DEFAULT_POLICY.auditLog, ...(p.auditLog || {}) };
     return p;
   }
+
+  const asArray = (v) => (Array.isArray(v) ? v : []);
 
   function clamp(n, lo, hi) {
     const v = Number(n);
@@ -2146,7 +2202,7 @@
       truncated,
       findings,
       risk,
-      verdict: verdict(risk, policy),
+      verdict: truncated ? truncatedVerdict() : verdict(risk, policy),
       policy,
       stats: {
         characters: body.length,
@@ -2230,6 +2286,19 @@
     return line;
   }
 
+  /**
+   * Text beyond MAX_INPUT is never scanned, so a truncated result must not read
+   * as safe — otherwise padding a prompt would smuggle anything past the cap.
+   * Callers must also never write `result.text` back, as it is only the head.
+   */
+  function truncatedVerdict() {
+    return {
+      headline: 'Too long to check completely',
+      detail: `Only the first ${MAX_INPUT.toLocaleString()} characters were scanned. Split the text into smaller pieces before sending.`,
+      action: 'block',
+    };
+  }
+
   function emptyResult(body, policy, started, truncated) {
     const risk = scoreRisk([]);
     return {
@@ -2237,7 +2306,7 @@
       truncated,
       findings: [],
       risk,
-      verdict: verdict(risk, policy),
+      verdict: truncated ? truncatedVerdict() : verdict(risk, policy),
       policy,
       stats: {
         characters: body.length,
@@ -2274,7 +2343,9 @@
     bandForScore: typeof bandForScore !== 'undefined' ? bandForScore : undefined,
     DEFAULT_POLICY: typeof DEFAULT_POLICY !== 'undefined' ? DEFAULT_POLICY : undefined,
     POLICY_PRESETS: typeof POLICY_PRESETS !== 'undefined' ? POLICY_PRESETS : undefined,
+    POLICY_LIMITS: typeof POLICY_LIMITS !== 'undefined' ? POLICY_LIMITS : undefined,
     normalisePolicy: typeof normalisePolicy !== 'undefined' ? normalisePolicy : undefined,
+    checkPatternSafety: typeof checkPatternSafety !== 'undefined' ? checkPatternSafety : undefined,
     RULES: typeof RULES !== 'undefined' ? RULES : undefined,
     RULES_BY_ID: typeof RULES_BY_ID !== 'undefined' ? RULES_BY_ID : undefined,
     extractEntities: typeof extractEntities !== 'undefined' ? extractEntities : undefined,

@@ -7,8 +7,9 @@
  * step in docs/CHROME_WEB_STORE.md.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,5 +31,11 @@ try {
   process.exit(1);
 }
 
+// Publish a checksum alongside the zip so a download can be verified with
+// `shasum -a 256 -c shadow-ai-privacy-auditor-extension.zip.sha256`.
+const digest = createHash('sha256').update(readFileSync(OUT)).digest('hex');
+writeFileSync(`${OUT}.sha256`, `${digest}  ${basename(OUT)}\n`);
+
 console.log(`✓ dist/shadow-ai-privacy-auditor-extension.zip`);
-console.log('  Upload this at https://chrome.google.com/webstore/devconsole');
+console.log(`✓ dist/shadow-ai-privacy-auditor-extension.zip.sha256  (${digest.slice(0, 16)}…)`);
+console.log('  Upload the zip at https://chrome.google.com/webstore/devconsole');

@@ -78,9 +78,9 @@ Open source: https://github.com/rohitdvv/shadow-ai-privacy-auditor
 
 | Field | Value |
 | --- | --- |
-| **Single purpose** | Detect and redact sensitive information in the user's text on AI chat sites, locally, before it is sent. |
-| **`storage` justification** | Store the user's own settings and a count-only activity log on their device. |
-| **Content-script / site access justification** | Read the message composer on a fixed list of AI chat sites to scan it locally and warn the user before sending. No host permissions are requested. |
+| **Single purpose** | Warn users before they send sensitive personal or confidential information (names, contact details, ID numbers, credentials, health data) to an AI chatbot, and help them redact it — entirely on their own device. |
+| **`storage` justification** | Saves the user's own detection settings, a one-time onboarding flag, and a local activity log that contains counts only (never prompt text or detected values). Also reads administrator-managed policy when an organisation deploys the extension. Nothing is transmitted. |
+| **Content-script / site access justification** | The extension must read the message box on a fixed list of AI chat sites (listed in the manifest) to scan what the user typed and warn them before it is sent — this is its single purpose. It runs only on those sites, requests no `host_permissions`, cannot make network requests (`connect-src 'none'`), and never sends page content anywhere. |
 | **Remote code** | No. All code is packaged in the extension. |
 | **Data collection disclosures** | Select **"does not collect"** for every category — nothing is transmitted off the device. |
 | **Privacy policy URL** | https://rohitdvv.github.io/shadow-ai-privacy-auditor/privacy.html |
@@ -98,6 +98,44 @@ Open source: https://github.com/rohitdvv/shadow-ai-privacy-auditor
 
 Save the draft, then **Submit for review**. Review typically takes a few hours to a
 few days. You'll get an email when it's published.
+
+## Resubmitting after a rejection (free — the $5 fee is one-time)
+
+1. Find the reason: dashboard → **Notifications** (left sidebar), or the email
+   sent to the **publisher** account's inbox. It names a policy (often a colour
+   codename) and the specific issue. Fix exactly that.
+2. Open the item → **Package** → **Upload new package** with the new zip. The
+   manifest `version` must be higher than any package previously uploaded
+   (v1.3.0 here).
+3. Re-check every tab — Store listing, Privacy practices, Distribution — then
+   **Submit for review** again. There is no charge for resubmitting.
+
+## Enterprise deployment (managed policy)
+
+From v1.3.0, IT admins can push an organisation policy that overrides user
+settings, with no network calls by the extension. Schema:
+`extension/managed_schema.json`.
+
+**Google Admin console:** Devices → Chrome → Apps & extensions → Users & browsers
+→ add the extension by ID → *Force install* → **Policy for extensions**, paste:
+
+```json
+{
+  "policy": {
+    "Value": {
+      "name": "Acme Corp policy",
+      "blockAtScore": 25,
+      "customTerms": ["Project Halberd", "Orchard release"],
+      "internalDomains": ["acme-corp.example"]
+    }
+  },
+  "forceEnabled": { "Value": true }
+}
+```
+
+Users then see "Managed by your organisation" in the options page, and the
+toolbar on/off switch is locked when `forceEnabled` is true. Unsafe custom regexes
+in a managed policy are rejected exactly as they are for user policies.
 
 ## 4. After publishing
 
