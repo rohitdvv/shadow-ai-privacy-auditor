@@ -7,13 +7,14 @@ Pricing figures below are **hypotheses to validate with customers**, not facts.
 
 ## 1. The one thing (the Jobs test)
 
-> **The only AI data-loss guard that provably cannot see your data.**
+> **The AI data-loss guard whose vendor never receives your data, and you can check that yourself.**
 
 Most enterprise DLP for AI works by routing prompts through a proxy or a
 vendor's cloud to inspect them. That asks a company to hand a third party the
 exact data it is trying to protect. This product does the opposite: detection
-runs inside the browser, the extension manifest sets `connect-src 'none'`, the
-code is open source, and CI proves there is no network code. **The privacy
+runs inside the browser, the code is open source, and CI checks that it contains
+no network code. (Do not claim the browser enforces this: `connect-src 'none'`
+covers the extension's own pages, not the content script.) **The privacy
 guarantee is not a feature — it is the moat and the sales pitch.** Every other
 decision should protect it.
 
@@ -39,7 +40,7 @@ The money is in the third row. The first row is distribution.
 be unlocked by a *signed license* pushed through Chrome managed storage, the same
 channel as the managed policy. The extension embeds a public key and verifies
 the signature offline (Ed25519 via WebCrypto). No licence server, no phone-home,
-and the `connect-src 'none'` promise stays intact. This is the feature to build
+and the no-network promise stays intact. This is the feature to build
 next if the business model is validated.
 
 ## 4. Distribution (first-principles)

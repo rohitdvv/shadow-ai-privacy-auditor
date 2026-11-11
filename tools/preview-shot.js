@@ -25,6 +25,11 @@
       welcome.hidden = shot !== 'welcome';
       if (shot === 'panel') s.getElementById('pill').click();
       if (shot === 'clean') s.getElementById('pillFix').click();
+      // Keep dev-only text (the harness label, the local dev host) out of store images.
+      const tag = document.querySelector('.demo-tag');
+      if (tag) tag.remove();
+      const host = s.getElementById('panelHost');
+      if (host) host.textContent = 'your AI chat';
       document.documentElement.setAttribute('data-shot-ready', '1');
     }, 450);
   });

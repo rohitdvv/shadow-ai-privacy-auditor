@@ -56,9 +56,10 @@ placeholders so you can still get a useful answer.
 Everything runs on your device.
 • No account, no servers, no analytics.
 • Your prompt text is never uploaded, logged, or sent anywhere — not even to us.
-• The extension requests only "storage" permission and zero host permissions.
-• Its manifest blocks all network access (connect-src 'none'), so it is technically
-  incapable of transmitting your text.
+• The extension requests only the "storage" permission and runs only on a fixed list
+  of AI chat sites.
+• Its code contains no network calls. An automated check enforces that on every
+  build, and the source is public so anyone can verify it.
 
 How it works
 • A live score pill appears above the message box.
@@ -80,7 +81,7 @@ Open source: https://github.com/rohitdvv/shadow-ai-privacy-auditor
 | --- | --- |
 | **Single purpose** | Warn users before they send sensitive personal or confidential information (names, contact details, ID numbers, credentials, health data) to an AI chatbot, and help them redact it — entirely on their own device. |
 | **`storage` justification** | Saves the user's own detection settings, a one-time onboarding flag, and a local activity log that contains counts only (never prompt text or detected values). Also reads administrator-managed policy when an organisation deploys the extension. Nothing is transmitted. |
-| **Content-script / site access justification** | The extension must read the message box on a fixed list of AI chat sites (listed in the manifest) to scan what the user typed and warn them before it is sent — this is its single purpose. It runs only on those sites, requests no `host_permissions`, cannot make network requests (`connect-src 'none'`), and never sends page content anywhere. |
+| **Content-script / site access justification** | The extension must read the message box on a fixed list of AI chat sites (listed in the manifest) to scan what the user typed and warn them before it is sent — this is its single purpose. It runs only on those sites, requests no `host_permissions`, contains no network code, and never sends page content anywhere. |
 | **Remote code** | No. All code is packaged in the extension. |
 | **Data collection disclosures** | Select **"does not collect"** for every category — nothing is transmitted off the device. |
 | **Privacy policy URL** | https://rohitdvv.github.io/shadow-ai-privacy-auditor/privacy.html |

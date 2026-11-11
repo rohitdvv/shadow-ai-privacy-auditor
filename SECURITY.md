@@ -39,7 +39,7 @@ vulnerabilities — please open a regular issue for those.
 
 | Guarantee | Enforcement |
 | --- | --- |
-| No network access | Extension pages ship `connect-src 'none'`; the web app ships the same CSP; CI (`npm run verify:offline`) fails on any `fetch`, XHR, WebSocket, beacon or remote reference in shipped code. |
+| No network access | Extension pages ship `connect-src 'none'`; the web app ships the same CSP. Content scripts are outside the extension-page CSP, so there the protection is the absence of network code, not browser enforcement. CI (`npm run verify:offline`) fails on any `fetch`, XHR, WebSocket, beacon or remote reference in shipped code. |
 | Minimal permissions | `permissions: ["storage"]`, `host_permissions: []`, content scripts on a fixed site list only. |
 | Page isolation | The in-page UI lives in a **closed** shadow root inside the content script's isolated world. |
 | No unscanned sends | Text beyond the scan limit is reported as "too long to check" and blocked, never as safe; it is never rewritten (no silent truncation). |

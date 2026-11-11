@@ -11,7 +11,8 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { mkdirSync, existsSync, rmSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -54,24 +55,35 @@ mkdirSync(OUT, { recursive: true });
 const profile = resolve(ROOT, 'dist', '.chrome-profile');
 mkdirSync(profile, { recursive: true });
 
+// Must be async: the static server above runs in this process, so a synchronous
+// spawn would block it and Chrome would wait forever for the page.
+const run = promisify(execFile);
+let failed = 0;
+
 const shots = ['pill', 'panel', 'clean', 'welcome'];
 for (const shot of shots) {
   const out = join(OUT, `shot-${shot}.png`);
   try {
-    execFileSync(chrome, [
+    await run(chrome, [
       '--headless=new', '--disable-gpu', '--hide-scrollbars',
       '--no-first-run', '--no-default-browser-check',
       `--user-data-dir=${profile}`,
       '--force-device-scale-factor=1', '--window-size=1280,800',
       '--virtual-time-budget=2500', `--screenshot=${out}`,
       `http://localhost:${PORT}/tools/extension-preview.html?shot=${shot}`,
-    ], { stdio: 'ignore', timeout: 60000 });
-    console.log(existsSync(out) ? `✓ dist/store-shots/shot-${shot}.png` : `✗ shot-${shot} produced no file`);
+    ], { timeout: 60000 });
+    if (existsSync(out)) console.log(`✓ dist/store-shots/shot-${shot}.png`);
+    else { failed++; console.error(`✗ shot-${shot} produced no file`); }
   } catch (e) {
+    failed++;
     console.error(`✗ shot-${shot} failed: ${e.message}`);
   }
 }
 
 rmSync(profile, { recursive: true, force: true });
 server.close();
+if (failed) {
+  console.error(`${failed} screenshot(s) failed.`);
+  process.exit(1);
+}
 console.log('Done. Upload these as the store screenshots (1280×800).');

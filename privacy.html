@@ -34,7 +34,7 @@
 <div class="wrap">
   <a class="back" href="./">← Shadow AI Privacy Auditor</a>
   <h1>Privacy Policy</h1>
-  <p class="lede">Shadow AI Privacy Auditor — web app and Chrome extension. Last updated: 27 October 2026.</p>
+  <p class="lede">Shadow AI Privacy Auditor — web app and Chrome extension. Last updated: 10 November 2026.</p>
 
   <div class="card tldr">
     <strong>In one sentence:</strong> this product collects nothing, transmits nothing, and has no servers. Everything happens on your device, and it is technically prevented from making network requests.
@@ -47,7 +47,7 @@
   <p>All detection and redaction happens locally, inside your own browser tab (web app) or the extension's content script (extension). Your prompt text is <strong>never</strong> sent to a server, to the extension's background worker, or to the host page.</p>
   <ul>
     <li>The web app ships a <code>connect-src 'none'</code> Content-Security-Policy, so the browser itself blocks any outbound request.</li>
-    <li>The extension's manifest sets <code>connect-src 'none'</code> and requests <strong>zero host permissions</strong>, so it cannot transmit data even if a bug tried to.</li>
+    <li>The extension's popup and settings pages ship <code>connect-src 'none'</code>, so the browser blocks outbound requests from them. The script that runs on AI chat sites is not covered by that rule. It is protected differently: it contains no network code, and it runs only on a fixed list of sites.</li>
     <li>A continuous integration check (<code>verify:offline</code>) fails the build if any shipped file contains <code>fetch</code>, <code>XMLHttpRequest</code>, <code>WebSocket</code>, <code>sendBeacon</code>, a remote import, or a remote asset reference.</li>
   </ul>
 

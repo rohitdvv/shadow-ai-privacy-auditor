@@ -343,7 +343,7 @@ npm run build:extension</code></pre>
 
     <div class="modal-note">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 4 5.5V11c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5.5Z"/></svg>
-      <span>Requests only the <code>storage</code> permission and <strong>zero</strong> host permissions. Its manifest sets <code>connect-src 'none'</code>, so it is technically incapable of sending your text anywhere.</span>
+      <span>Requests only the <code>storage</code> permission and runs only on a fixed list of AI chat sites. Its open-source code contains no network calls, and an automated check enforces that on every build.</span>
     </div>
 
     <div class="modal-foot">

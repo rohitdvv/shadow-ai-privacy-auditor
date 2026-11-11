@@ -23,6 +23,8 @@ const FORBIDDEN = [
   { re: /\bWebSocket\s*\(/, name: 'WebSocket' },
   { re: /\bEventSource\s*\(/, name: 'EventSource' },
   { re: /navigator\.sendBeacon/, name: 'navigator.sendBeacon' },
+  { re: /\bnew\s+Image\s*\(/, name: 'new Image() (request via image load)' },
+  { re: /createElement\s*\(\s*['"`](img|script|iframe|link|form)['"`]/i, name: 'createElement of a loading element' },
   { re: /\bimportScripts\s*\(/, name: 'importScripts' },
   { re: /\bnew\s+Worker\s*\(\s*['"]https?:/, name: 'remote Worker' },
   { re: /import\s*\(\s*['"]https?:/, name: 'remote dynamic import' },
@@ -68,4 +70,4 @@ if (violations.length) {
 }
 
 console.log('✓ No fetch, XHR, WebSocket, beacon, remote import or remote asset reference found.');
-console.log('✓ The offline guarantee holds: the auditor cannot transmit your text.');
+console.log('✓ The offline guarantee holds: no shipped code transmits your text.');
