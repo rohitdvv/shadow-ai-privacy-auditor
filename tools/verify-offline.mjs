@@ -14,7 +14,7 @@ import { extname, join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SCAN_DIRS = ['engine', 'assets', 'extension', 'tests'];
+const SCAN_DIRS = ['engine', 'assets', 'extension', 'cli', 'tests'];
 const SKIP = new Set(['node_modules', '.git', 'dist']);
 
 const FORBIDDEN = [

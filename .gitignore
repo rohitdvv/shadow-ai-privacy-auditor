@@ -16,3 +16,4 @@ coverage/
 # local unzipped release/store artefacts — never commit
 shadow-ai-privacy-auditor-extension/
 store-screenshots-*/
+.gstack/

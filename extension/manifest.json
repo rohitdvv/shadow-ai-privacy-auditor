@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Shadow AI Privacy Auditor",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Warns you before you paste names, IDs, passwords or health data into ChatGPT, Claude, Gemini or Copilot. 100% on your device.",
   "homepage_url": "https://rohitdvv.github.io/shadow-ai-privacy-auditor/",
   "minimum_chrome_version": "111",

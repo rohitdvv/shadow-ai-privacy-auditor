@@ -38,6 +38,17 @@ const NON_NAME_WORDS = setOf([
   'findings','conclusion','recommendation','recommendations','appendix','reference','references','glossary',
   'risk','risks','issue','issues','action','actions','decision','decisions','next','steps','owner','status',
   'phase','stage','sprint','iteration','release','version','build','environment','production','staging',
+  // product, interface and engineering vocabulary that is routinely title-cased
+  'settings','page','pages','save','changes','change','log','pull','request','requests','merge','commit',
+  'server','client','gateway','payment','payments','checkout','button','menu','tab','panel','dialog','modal',
+  'form','field','table','column','row','index','query','database','cache','queue','worker','runner','job',
+  'pipeline','workflow','action','deploy','deployment','docker','compose','express','http','https','api',
+  'app','application','router','component','module','class','function','method','service','controller',
+  'series','round','seed','review','reviews','score','promoter','net','gross','margin','order','quantity',
+  'terms','privacy','source','open','time','black','golden','gate','bridge','pro','air','mini','max','plus',
+  'studio','code','visual','null','pointer','error','exception','test','tests','user','users','admin',
+  'address','speech','act','award','prize','cup','league','university','college','school','hospital',
+  'mode','strict','safe','dark','light','debug','demo','day','board','team','list','load','more',
   // frequently capitalised misc
   'internet','email','online','offline','remote','hybrid','office','headquarters','campus','building','room',
   'north','south','east','west','street','avenue','road','city','town','county','state','province','country',
@@ -104,11 +115,15 @@ function contextWindow(text, start, end, radius = 60) {
   return text.slice(Math.max(0, start - radius), Math.min(text.length, end + radius)).toLowerCase();
 }
 
-function hasPersonCue(text, start, end) {
+/** Possessives sit near almost anything ("my React component"), so they only support a known first name. */
+const WEAK_PERSON_CUES = setOf(['my', 'our', 'his', 'her', 'their']);
+
+function hasPersonCue(text, start, end, strongOnly = false) {
   const before = text.slice(Math.max(0, start - 45), start).toLowerCase();
   const after = text.slice(end, Math.min(text.length, end + 35)).toLowerCase();
   const window = before + ' \u0000 ' + after;
   return PERSON_CONTEXT_CUES.some((cue) => {
+    if (strongOnly && WEAK_PERSON_CUES.has(cue)) return false;
     if (cue.includes(' ')) return window.includes(cue);
     return new RegExp(`\\b${cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(window);
   });
@@ -129,6 +144,11 @@ export function extractEntities(text) {
     // Grow a maximal run of capitalised tokens (particles allowed in the middle).
     let j = i;
     while (j + 1 < tokens.length) {
+      // A full stop ends the sentence, and a name never spans two sentences:
+      // "…the Pull Request. Ask John Carter" is not one five-word name. Initials
+      // ("J.") and titles ("Dr.") keep their full stop and carry on.
+      const cur = tokens[j];
+      if (cur.raw.endsWith('.') && cur.lower.length > 1 && !HONORIFICS.has(cur.lower)) break;
       const gap = text.slice(tokens[j].end, tokens[j + 1].start);
       if (!/^[ \t]*[-'’]?[ \t]*$/.test(gap) || gap.length > 2) break;
       const next = tokens[j + 1];
@@ -141,7 +161,10 @@ export function extractEntities(text) {
     let run = tokens.slice(i, j + 1);
     while (run.length > 1 && LEADING_NON_NAME.has(run[0].lower)) run = run.slice(1);
     const start = run[0].start;
-    const end = run[run.length - 1].end;
+    // The tokenizer keeps a trailing full stop for initials ("J.") and titles.
+    // On a longer last word it is the end of the sentence, not part of the name.
+    const last = run[run.length - 1];
+    const end = last.raw.endsWith('.') && last.raw.length > 2 ? last.end - 1 : last.end;
     const value = text.slice(start, end);
     const words = run.map((t) => t.lower);
 
@@ -162,9 +185,12 @@ function classifyRun({ text, run, words, value, start, end }) {
   if (words.every((w) => PLACE_NAMES.has(w))) return null;
   if (run.every((t) => t.allCaps) && !words.some((w) => GIVEN_NAMES.has(w))) return null; // acronyms
   if (value.length < 3) return null;
+  // "Big O", "Plan B", "Series A": a bare single letter is a label, not a surname (an initial is "J.").
+  if (run.some((t) => t.raw.length === 1) && !words.some((w) => GIVEN_NAMES.has(w))) return null;
 
   const prevWord = previousWord(text, start);
-  const hasHonorific = prevWord && HONORIFICS.has(lc(prevWord));
+  // The title can sit just before the run ("Dr Okafor" after a lower-case word) or open it ("Mr. Okafor").
+  const hasHonorific = Boolean(prevWord && HONORIFICS.has(lc(prevWord))) || (words.length > 1 && HONORIFICS.has(words[0]));
   const hasGazetteerHit = words.some((w) => GIVEN_NAMES.has(w));
   // "Roth IRA", "Project ALPHA", "Amazon AWS" — an embedded acronym means this is a
   // term of art, not a person, unless a first name or honorific says otherwise.
@@ -198,7 +224,7 @@ function classifyRun({ text, run, words, value, start, end }) {
   const prevToken = prevWord;
   const honorific = hasHonorific;
   const gazetteerHit = hasGazetteerHit;
-  const cue = hasPersonCue(text, start, end);
+  const cue = hasPersonCue(text, start, end, !hasGazetteerHit && !hasHonorific);
   const sentenceInitial = isSentenceInitial(text, run[0]);
   const multiWord = run.filter((t) => t.cap).length >= 2;
   const containsNonName = words.some((w) => NON_NAME_WORDS.has(w) || PLACE_NAMES.has(w));
@@ -206,16 +232,20 @@ function classifyRun({ text, run, words, value, start, end }) {
   let score = 0;
   if (multiWord) { score += 0.5; signals.push('two or more capitalised words'); }
   if (gazetteerHit) { score += 0.3; signals.push('matches a common given name'); }
-  if (honorific) { score += 0.45; signals.push(`preceded by honorific "${prevToken}"`); }
+  if (honorific) { score += 0.55; signals.push(`preceded by honorific "${prevToken}"`); }
   if (cue) { score += 0.25; signals.push('appears next to a person-role cue'); }
   if (!multiWord && !gazetteerHit && !honorific) return null;
   if (!multiWord && sentenceInitial && !honorific) return null;
   if (sentenceInitial && !gazetteerHit && !honorific && !cue) score -= 0.2;
   if (containsNonName && !gazetteerHit && !honorific) score -= 0.35;
+  // Capital letters alone are weak evidence: "Golden Gate Bridge", "Pull Request"
+  // and "Save Changes" look exactly like a name. Without a known first name, a
+  // title or a person cue, stay below the default reporting threshold.
+  if (multiWord && !gazetteerHit && !honorific && !cue) { score -= 0.2; signals.push('capitalisation is the only evidence'); }
   if (/'s$|’s$/.test(value)) score += 0.05;
 
   // Possessive/plural stripping for the reported value.
-  if (score < 0.5) return null;
+  if (score < 0.3) return null;
 
   const severity = score >= 0.75 ? S.HIGH : S.MEDIUM;
 

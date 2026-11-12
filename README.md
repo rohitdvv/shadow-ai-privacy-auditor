@@ -1,15 +1,17 @@
 # Shadow AI Privacy Auditor
 
-**Check what you are about to paste into ChatGPT, Gemini or Copilot — before you paste it.**
+**One privacy policy for everywhere your team prompts: the browser, the terminal and coding agents. No server, no account.**
 
 ### ▶︎ [Try the live web app](https://rohitdvv.github.io/shadow-ai-privacy-auditor/) · [Download the extension](https://github.com/rohitdvv/shadow-ai-privacy-auditor/releases/latest)
 
-A local-only privacy auditor that finds sensitive information in text, explains why each item is risky, and produces a redacted version that is still useful to send. It ships as two things that share one detection engine:
+A local-only privacy auditor that finds sensitive information in text, explains why each item is risky, and produces a redacted version that is still useful to send. It ships as four things that share one detection engine and one policy file:
 
 | | What it is | Where it runs |
 | --- | --- | --- |
 | **Web app** | Paste text, review findings, copy the safe version | Any static host — `index.html` |
 | **Chrome extension** | Watches the composer on AI chat sites and interrupts risky sends | Manifest V3, `extension/` |
+| **Command line** | `shadow-ai scan / redact / restore` for files and pipes | Node 18+, `cli/` — see [docs/CLI.md](docs/CLI.md) |
+| **Claude Code hook** | Blocks a prompt containing a key, password or identifier before it is sent | `shadow-ai hook claude-code` |
 
 > **Nothing you type ever leaves your device.** There is no backend, no API key and no analytics. `npm run verify:offline` fails the build if any shipped file contains `fetch`, `XMLHttpRequest`, `WebSocket`, `sendBeacon`, a remote import or a remote asset reference. The web app additionally ships a `connect-src 'none'` Content-Security-Policy, so the browser itself blocks outbound requests.
 
@@ -81,7 +83,7 @@ A privacy tool that redacts everything gets switched off in a week. Precision is
 - **Prose-versus-secret discrimination.** `password is important` is prose; `password is Autumn!Ledger42` is a secret. The rule requires the captured value to look machine-set, not dictionary.
 - **Educational framing is downgraded.** "What is type 2 diabetes?" scores 0. "Patient Marcus Chen was diagnosed with type 2 diabetes" scores 100.
 
-**Measured result:** 45/45 ordinary prompts return zero findings, 0 false positives across the whole suite, and `The project meeting is scheduled for 3:00 PM.` comes back byte-for-byte unchanged.
+**Measured result:** 114/114 ordinary prompts in the project's own corpus return zero findings, and `The project meeting is scheduled for 3:00 PM.` comes back byte-for-byte unchanged.
 
 ---
 
@@ -89,7 +91,7 @@ A privacy tool that redacts everything gets switched off in a week. Precision is
 
 ```
 cases      36/36 passed
-benign     45/45 clean   (false-positive rate 0.0%)
+benign     114/114 clean (false-positive rate 0.0%)
 precision  100.0%        (58 true positives, 0 false positives)
 recall     100.0%        (0 missed)
 F1         100.0%
@@ -97,6 +99,8 @@ speed      1.5 ms per prompt
 ```
 
 Full case-by-case table, worked examples and redacted outputs: **[docs/TEST_RESULTS.md](docs/TEST_RESULTS.md)**.
+
+**Read these numbers with care.** The corpus is small and written by this project, so it measures regressions, not real-world accuracy. Until v1.4.0 the benign set had 45 prompts and missed that the engine read the word "add" as a health condition; a wider set of everyday prompts showed about one false warning in three before that was fixed. A separate batch of 45 prompts written afterwards gave 2 false warnings before tuning.
 
 Reproduce with `npm test`. Every value in the corpus is fictional; identifier values were generated to satisfy their checksums so the validators are genuinely exercised.
 
@@ -179,7 +183,8 @@ extension/                 Manifest V3 Chrome extension
   content/                   real-time monitoring + send interception
   popup/  options/           status UI and full policy editor
   vendor/engine.bundle.js    generated — do not edit
-tests/                     36 fictional cases, 45 benign prompts, runner with metrics
+cli/                       shadow-ai command line + Claude Code hook (same engine)
+tests/                     36 fictional cases, 114 benign prompts, security and CLI suites
 tools/                     bundler, icon generator, offline verifier, dev server
 docs/                      detection write-up, results, limitations, demo script
 ```
@@ -202,6 +207,8 @@ docs/                      detection write-up, results, limitations, demo script
 Summarised here, in full in **[docs/LIMITATIONS.md](docs/LIMITATIONS.md)**:
 
 - English-first. Latin-script names are handled by shape, but the gazetteers, medical and business vocabulary are English.
+- The extension has been exercised on a local mock page, not yet on each live AI site.
+- Restoring real values into an assistant's answer exists on the command line only, not yet in the extension.
 - Rule-based NER cannot resolve genuine ambiguity — an unusual name with no supporting cue can be missed, and a capitalised product name can occasionally be treated as a person.
 - Free-text confidential information without a marker word ("we are going to lose the Henderson account") is only partly detectable.
 - Images, PDFs and other attachments are out of scope; only text is analysed.

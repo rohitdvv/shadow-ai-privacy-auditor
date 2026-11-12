@@ -150,6 +150,78 @@ await test('a lone imperative is not flagged as a name', () => {
   assert.equal(scan('Email the team about Friday.').findings.filter((f) => f.label === 'NAME').length, 0);
 });
 
+/* Health terms that are also ordinary words -------------------------------- */
+
+const labels = (text) => scan(text).findings.map((f) => f.label);
+
+for (const prompt of [
+  'Please add tests for the login form.',
+  'ALTER TABLE orders ADD COLUMN shipped_at timestamp;',
+  'Why does std::vector reallocate?',
+  'Set the SVG stroke to 2px and the fill to none.',
+  'Give me visual aids ideas for a talk.',
+  'What does the blind index pattern mean?',
+  'It reads like a depression-era newspaper.',
+]) {
+  await test(`ordinary word is not a health condition: "${prompt.slice(0, 34)}"`, () => {
+    assert.ok(!labels(prompt).includes('MEDICAL_CONDITION'), `flagged: ${JSON.stringify(scan(prompt).findings.map((f) => f.value))}`);
+  });
+}
+
+for (const [prompt, term] of [
+  ['My patient has ADD and takes Ritalin.', 'ADD'],
+  ['She had a stroke last year and is recovering.', 'stroke'],
+  ['My brother is legally blind.', 'blind'],
+  ['He was diagnosed with depression in March.', 'depression'],
+  ['The employee disclosed a disability to HR.', 'disability'],
+  ['AIDS diagnosis confirmed for the client.', 'AIDS'],
+  ['Patient chart: STD screening positive.', 'STD'],
+]) {
+  await test(`the same word about a person is still caught: "${term}"`, () => {
+    const hit = scan(prompt).findings.find((f) => f.label === 'MEDICAL_CONDITION');
+    assert.ok(hit, 'no health finding');
+    assert.equal(hit.value, term);
+  });
+}
+
+await test('context cues match whole words, not fragments ("er" inside "Carter")', () => {
+  const f = scan('Ask John Carter about diabetes research funding.').findings.find((x) => x.label === 'MEDICAL_CONDITION');
+  assert.ok(!f || !(f.signals || []).some((s) => /supporting context: .*\ber\b/.test(s)));
+});
+
+/* Name boundaries ---------------------------------------------------------- */
+
+await test('a sentence-final full stop is not part of the name', () => {
+  const names = scan('Also cc Priya Shah and John Carter.').findings.filter((f) => f.label === 'NAME').map((f) => f.value);
+  assert.deepEqual(names, ['Priya Shah', 'John Carter']);
+  assert.equal(redact('Talk to John Carter.', scan('Talk to John Carter.').findings).text, 'Talk to [NAME_1].');
+});
+
+await test('a name does not run across a sentence boundary', () => {
+  const text = 'Please fix the Pull Request. Ask John Carter. Dr. Amara Okonkwo and J. Rivera agree.';
+  const r = scan(text);
+  const names = r.findings.filter((f) => f.label === 'NAME').map((f) => f.value);
+  assert.ok(names.includes('John Carter'), JSON.stringify(names));
+  assert.ok(names.every((n) => !n.includes('Request') && !n.includes('Ask')), JSON.stringify(names));
+  assert.ok(redact(text, r.findings).text.startsWith('Please fix the Pull Request. Ask [NAME_1].'));
+});
+
+await test('a title plus surname is redacted by default', () => {
+  const text = 'Priya Shah will call Mr. Okafor tomorrow.';
+  assert.equal(redact(text, scan(text).findings).text, '[NAME_1] will call [NAME_2] tomorrow.');
+});
+
+await test('title-cased interface text is not a person', () => {
+  for (const p of ['Open the Settings Page and click Save Changes.', 'Runs on every Pull Request.', 'A haiku about the Golden Gate Bridge.']) {
+    assert.deepEqual(labels(p), [], p);
+  }
+});
+
+await test('an uncommon name next to a person cue is still caught', () => {
+  assert.ok(labels('Please forward this to Zubair Khattak, our new client.').includes('NAME'));
+  assert.ok(labels('The candidate Oluwaseun Adeyemi applied yesterday.').includes('NAME'));
+});
+
 /* Shipped sources are clean text (no embedded NUL bytes) ------------------ */
 
 await test('no NUL bytes in shipped source files', () => {

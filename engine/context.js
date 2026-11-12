@@ -6,7 +6,7 @@
  */
 
 import { SEVERITY_RANK } from './constants.js';
-import { CATEGORY_CONTEXT_CUES, CONTEXT_WINDOW } from './patterns.js';
+import { CATEGORY_CONTEXT_CUES, CONTEXT_WINDOW, hasCue } from './patterns.js';
 import { PLACEHOLDER_CUES } from './gazetteers.js';
 
 /**
@@ -83,7 +83,7 @@ export function scoreContext(finding, text) {
   let confidence = finding.confidence;
 
   const cues = CATEGORY_CONTEXT_CUES[finding.category] || [];
-  const hits = cues.filter((c) => ctx.includes(c.toLowerCase()));
+  const hits = cues.filter((c) => hasCue(ctx, c));
   if (hits.length) {
     confidence += Math.min(0.15, 0.05 * hits.length);
     signals.push(`supporting context: ${hits.slice(0, 3).join(', ')}`);

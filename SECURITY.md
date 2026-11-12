@@ -39,6 +39,8 @@ vulnerabilities — please open a regular issue for those.
 
 | Guarantee | Enforcement |
 | --- | --- |
+| Command-line vault | `shadow-ai redact --vault` stores original values so answers can be restored. The file is written owner-only (mode 600), parsed strictly, and restored by literal replacement only. It is as sensitive as the text it came from: keep it out of version control. |
+| Verifiable builds | The extension zip is reproducible, and the release workflow signs build provenance (`gh attestation verify`). |
 | No network access | Extension pages ship `connect-src 'none'`; the web app ships the same CSP. Content scripts are outside the extension-page CSP, so there the protection is the absence of network code, not browser enforcement. CI (`npm run verify:offline`) fails on any `fetch`, XHR, WebSocket, beacon or remote reference in shipped code. |
 | Minimal permissions | `permissions: ["storage"]`, `host_permissions: []`, content scripts on a fixed site list only. |
 | Page isolation | The in-page UI lives in a **closed** shadow root inside the content script's isolated world. |

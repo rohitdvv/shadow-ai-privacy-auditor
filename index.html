@@ -58,9 +58,9 @@
 <section class="hero" id="hero" aria-labelledby="heroTitle">
   <div class="hero-inner">
     <div class="hero-copy">
-      <span class="eyebrow"><span class="eyebrow-dot"></span> Privacy firewall for the copy-paste era</span>
-      <h2 id="heroTitle">Stop leaking secrets to AI.<br><span class="grad">Check before you paste.</span></h2>
-      <p class="hero-sub">A name, a client's ID, a password, an API key — sensitive details slip into AI prompts every day, often without you noticing. This tool finds them in milliseconds, explains the risk, and hands you a safe version to send — <strong>without a single byte leaving your browser.</strong></p>
+      <span class="eyebrow"><span class="eyebrow-dot"></span> Open source · no server · no account</span>
+      <h2 id="heroTitle">One privacy policy for<br><span class="grad">everywhere your team prompts.</span></h2>
+      <p class="hero-sub">Catches client names, ID numbers, passwords and API keys before they reach ChatGPT, Claude or a coding agent, and hands back a safe version to send. It works in the browser and the terminal from one shared policy file. <strong>Nothing is hosted, so there is no one to send your text to.</strong></p>
       <div class="hero-cta">
         <button class="btn primary" id="btnAddChrome">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 8h8.5M7.5 6.5 12 12M9.7 20.2 12 12"/></svg>
@@ -71,13 +71,13 @@
           Try the live demo
         </button>
       </div>
-      <p class="hero-note">No sign-up. Nothing uploaded. Works on ChatGPT, Claude, Gemini, Copilot, Perplexity &amp; more. <button class="linklike" id="btnHowInstall">How do I install it? →</button></p>
+      <p class="hero-note">No sign-up. Works on ChatGPT, Claude, Gemini, Copilot, Perplexity &amp; more. <button class="linklike" id="btnHowInstall">How do I install it? →</button> <a class="linklike" href="#why">How is this different? →</a></p>
     </div>
     <ul class="hero-stats" aria-label="At a glance">
-      <li><strong>0</strong><span>network calls — ever</span></li>
-      <li><strong>72</strong><span>detection rules</span></li>
-      <li><strong>~2<em>ms</em></strong><span>per scan</span></li>
-      <li><strong>100%</strong><span>precision on tests</span></li>
+      <li><strong>0</strong><span>servers involved</span></li>
+      <li><strong>3</strong><span>places it works: browser, terminal, coding agents</span></li>
+      <li><strong>1</strong><span>policy file for the whole team</span></li>
+      <li><strong>~2<em>ms</em></strong><span>per check, on your device</span></li>
     </ul>
   </div>
 </section>
@@ -374,6 +374,61 @@ npm run build:extension</code></pre>
 
 <div class="scrim" id="scrim" hidden></div>
 
+<!-- ---------------------------------------------------------------- -->
+<!-- Why this one                                                      -->
+<!-- ---------------------------------------------------------------- -->
+<section class="why" id="why" aria-labelledby="whyTitle">
+  <div class="why-inner">
+    <h2 id="whyTitle">The same check, wherever the prompt is written</h2>
+    <p class="why-lede">Plenty of tools promise to run locally. This one is built for a team: one policy file, used by every surface, with nothing hosted in between.</p>
+
+    <div class="why-grid">
+      <article class="why-card">
+        <h3>In the browser</h3>
+        <p>A score appears above the message box on AI chat sites. One click replaces what is sensitive; sending anyway is always your call.</p>
+        <p class="why-meta">Chrome, Edge, Brave · store review pending</p>
+      </article>
+      <article class="why-card">
+        <h3>In the terminal and coding agents</h3>
+        <p>Scan a file or a paste, get a safe version, and put the real values back into the answer. A hook stops a prompt with a key or password before Claude Code sends it.</p>
+        <pre class="code-block"><code>shadow-ai redact notes.txt --vault s.json
+shadow-ai restore reply.txt --vault s.json</code></pre>
+      </article>
+      <article class="why-card">
+        <h3>One policy for the team</h3>
+        <p>Commit <code>.shadow-ai.json</code> to a repository, or push it from Google Admin. Everyone gets the same rules, with no console to run and no account to create.</p>
+        <p class="why-meta">Presets for healthcare, finance, engineering and strict environments</p>
+      </article>
+    </div>
+
+    <div class="why-table-wrap">
+      <table class="why-table">
+        <caption>Where it fits, and where it does not</caption>
+        <thead>
+          <tr><th scope="col"></th><th scope="col">Enterprise AI security platform</th><th scope="col">Typical privacy extension</th><th scope="col">Shadow AI Privacy Auditor</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Getting started</th><td>Demo call and contract</td><td>Install</td><td>Install, or commit one file</td></tr>
+          <tr><th scope="row">Shared team rules</th><td>Yes, in a cloud console</td><td>Usually not</td><td>Yes, in a file you own</td></tr>
+          <tr><th scope="row">Terminal and coding agents</th><td>Yes, with installed agents</td><td>No</td><td>Yes</td></tr>
+          <tr><th scope="row">Vendor servers in the path</th><td>Yes</td><td>Varies</td><td>None</td></tr>
+          <tr><th scope="row">Certifications and a support desk</th><td>Yes</td><td>No</td><td>No</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="why-verify">
+      <h3>Do not take our word for it</h3>
+      <ul>
+        <li>The source is public, and every build fails if any shipped file contains a network call.</li>
+        <li>The extension package is reproducible: build the tagged source and you get the same file hash.</li>
+        <li>Each release is signed by the build system. Check a download with<br><code>gh attestation verify shadow-ai-privacy-auditor-extension.zip --repo rohitdvv/shadow-ai-privacy-auditor</code></li>
+        <li>It is a safety net built from rules, not a guarantee. It will miss things, and the <a href="./docs/LIMITATIONS.md">limitations</a> are written down.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 <footer class="footer">
   <div>
     <strong>How it works:</strong> checksum-validated pattern matching (Luhn, IBAN mod-97, Verhoeff, ABA), rule-based name and organisation recognition, and a context scorer that suppresses safe spans such as times, dates, versions and percentages.
@@ -385,9 +440,13 @@ npm run build:extension</code></pre>
     <a href="https://github.com/rohitdvv/shadow-ai-privacy-auditor/releases/latest" target="_blank" rel="noopener">Releases</a>
     <span aria-hidden="true">·</span>
     <a href="./docs/DETECTION.md">Detection</a>
+    <span aria-hidden="true">·</span>
+    <a href="./docs/CLI.md">Command line</a>
+    <span aria-hidden="true">·</span>
+    <a href="./privacy.html">Privacy</a>
   </div>
   <div class="muted small">
-    Built for the CDF Shadow AI Hackathon. All examples in this project are fictional. No real personal, medical, financial, immigration, employee, volunteer or organisational data is used or stored.
+    Open source under the MIT licence. All examples in this project are fictional. No real personal, medical, financial, immigration, employee, volunteer or organisational data is used or stored.
   </div>
 </footer>
 

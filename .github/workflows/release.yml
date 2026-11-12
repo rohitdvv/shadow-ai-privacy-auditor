@@ -1,0 +1,79 @@
+name: Release
+
+# Builds the extension zip from a tag, signs build provenance for it, and
+# attaches it to the GitHub release. Anyone can then check that a zip came from
+# this repository's CI:
+#   gh attestation verify shadow-ai-privacy-auditor-extension.zip --repo rohitdvv/shadow-ai-privacy-auditor
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:   # dry run: build and attest, publish nothing
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # attach files to the release
+      id-token: write       # sign the attestation
+      attestations: write   # store it
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Tag matches the package and manifest versions
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          node -e "
+            const tag = process.env.TAG;
+            const pkg = require('./package.json').version;
+            const ext = require('./extension/manifest.json').version;
+            if (tag !== 'v' + pkg || pkg !== ext) throw new Error('version mismatch: tag ' + tag + ', package ' + pkg + ', manifest ' + ext);
+            console.log('versions agree:', tag);
+          "
+
+      - name: Offline guarantee
+        run: npm run verify:offline
+
+      - name: Tests
+        run: npm test
+
+      - name: Bundle is up to date with engine/
+        run: |
+          npm run build:extension
+          git diff --exit-code -- extension/vendor/engine.bundle.js
+
+      - name: Package the extension (reproducible zip)
+        run: |
+          node tools/package-extension.mjs
+          echo '### Extension package' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat dist/shadow-ai-privacy-auditor-extension.zip.sha256 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sign build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/shadow-ai-privacy-auditor-extension.zip
+
+      - name: Attach to the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          gh release upload "$TAG" \
+            dist/shadow-ai-privacy-auditor-extension.zip \
+            dist/shadow-ai-privacy-auditor-extension.zip.sha256 \
+            --clobber

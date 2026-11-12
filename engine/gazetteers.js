@@ -119,6 +119,25 @@ export const MEDICAL_CONDITIONS = [
   'std','sti','chlamydia','gonorrhea','syphilis','herpes','hpv',
 ];
 
+/**
+ * Health terms that are also everyday English or technical vocabulary:
+ * "add a button", "std::vector", "SVG stroke", "visual aids", "blind index".
+ * On their own they say nothing about anyone's health, so the condition rule
+ * only reports them with supporting evidence (see medical_condition in
+ * patterns.js). Unambiguous terms such as "diabetes" are not listed here.
+ */
+export const AMBIGUOUS_MEDICAL = {
+  /** Reported only when written in capitals AND next to clinical vocabulary. */
+  acronymNeedsContext: set(['add', 'std', 'sti', 'ocd']),
+  /** Reported only when written in capitals ("AIDS", never "visual aids"). */
+  acronymOnly: set(['aids']),
+  /** Reported only next to clinical vocabulary or tied to a person ("she had a stroke"). */
+  wordNeedsLink: set([
+    'blind', 'deaf', 'stroke', 'depression', 'transplant', 'detox', 'rehab', 'disability',
+    'addiction', 'cataract', 'anxiety disorder', 'chronic pain', 'migraine', 'pregnancy',
+  ]),
+};
+
 /** Prescription and controlled drugs commonly named in notes. */
 export const MEDICATIONS = [
   'metformin','insulin','lisinopril','amlodipine','atorvastatin','simvastatin','losartan','metoprolol',

@@ -1,99 +1,135 @@
-# Strategy — from hackathon project to a business
+# Strategy
 
-How a top-tier product team would take Shadow AI Privacy Auditor to market.
-Pricing figures below are **hypotheses to validate with customers**, not facts.
+Rewritten 12 November 2026 after a review of the market
+([COMPETITORS.md](COMPETITORS.md)). Prices and timelines here are
+**hypotheses to test with customers**, not facts.
 
 ---
 
-## 1. The one thing (the Jobs test)
+## 1. What the market review changed
 
-> **The AI data-loss guard whose vendor never receives your data, and you can check that yourself.**
+The earlier plan rested on "it runs locally, so the vendor never sees your
+data". About a dozen products make that same promise, and several are open
+source. It is the entry ticket, not the pitch.
 
-Most enterprise DLP for AI works by routing prompts through a proxy or a
-vendor's cloud to inspect them. That asks a company to hand a third party the
-exact data it is trying to protect. This product does the opposite: detection
-runs inside the browser, the code is open source, and CI checks that it contains
-no network code. (Do not claim the browser enforces this: `connect-src 'none'`
-covers the extension's own pages, not the content script.) **The privacy
-guarantee is not a feature — it is the moat and the sales pitch.** Every other
-decision should protect it.
+Three other facts shape the plan:
 
-## 2. Work backwards from the customer (the Bezos test)
+- **The enterprise vendors are out of reach on trust.** They have
+  certifications, customer logos and sales teams. They also sell by demo call
+  and annual contract, which shuts out small firms.
+- **The consumer tier is crowded and tiny.** Prices sit at $0–8 a month and one
+  store listing showed 105 users. Individuals mostly do not pay for this.
+- **AI use is leaving the chat box.** The enterprise vendors now lead with
+  agents, MCP servers and coding tools. A browser extension alone covers a
+  shrinking share of where prompts are written.
 
-| Customer | Their real pain | What they buy |
+## 2. The bet
+
+> **One policy for every place your team prompts. No server. Check it yourself.**
+
+A small team writes one policy file. The same file drives the browser extension,
+the command line and the coding-agent hook, using the same detection engine in
+all three. Nothing is hosted, so there is no account, no console and no vendor
+to trust with data. The build is reproducible and signed, so the "no server"
+claim can be checked instead of believed.
+
+No single piece of this is unique. The combination is, as of the review date:
+the small tools each cover one surface, and the vendors that cover all of them
+do it with a cloud console.
+
+## 3. Who it is for
+
+**Teams of roughly 10–200 people doing regulated or confidential work without a
+security department**: law firms, clinics, accountancies, recruiters, agencies
+and software consultancies bound by client NDAs.
+
+| | Enterprise platform | Consumer extension | This project |
+| --- | --- | --- | --- |
+| Buying process | Demo call, contract | Install | Install, or commit one file |
+| Shared team rules | Yes, in a cloud console | Mostly no | Yes, in a file the team owns |
+| Covers terminal and coding agents | Yes, with installed agents | No | Yes, CLI and hook |
+| Vendor infrastructure in the path | Yes | Varies | None |
+| Certifications, support desk | Yes | No | No |
+
+The last row is the honest cost of this position. A buyer who needs a SOC 2
+report or a support contract should buy from the first column.
+
+## 4. Product surfaces (v1.4.0)
+
+| Surface | Status | Policy source |
 | --- | --- | --- |
-| Individual professional | "I pasted a client's details into ChatGPT and felt sick." | A seatbelt. Free. |
-| Team lead / small company | "I can't tell staff to stop using AI, but I can't afford a leak." | Shared rules for the team. |
-| CISO / compliance officer | "Shadow AI use is a reportable-breach risk under GDPR/HIPAA/PCI." | Org-wide enforcement + evidence for auditors. |
+| Chrome extension | Built; store review pending; not yet tested on the live AI sites | Settings import, or pushed by an admin (managed policy) |
+| Command line (`shadow-ai scan / redact / restore`) | Built and tested | `--policy`, or `.shadow-ai.json` in the project |
+| Claude Code hook | Built and tested against the documented hook contract | Same `.shadow-ai.json` |
+| Web checker | Live | Same JSON, import and export |
 
-The money is in the third row. The first row is distribution.
+`.shadow-ai.json` committed to a repository is the distribution mechanism for
+teams: every developer who clones the repo gets the team's rules with no admin
+console and no rollout.
 
-## 3. Business model — monetise without a backend
+## 5. Business model
 
-| Tier | Price (hypothesis) | What you get |
+| Tier | Price (hypothesis) | What it adds |
 | --- | --- | --- |
-| **Free** | $0, forever | Full detection, Fix, review panel, local log. No ads, no data, ever. |
-| **Team** | ~$3–5 / user / month | Shared policy file, custom rules & restricted terms, policy presets per team. |
-| **Enterprise** | annual contract | Force-install via Google Admin / Intune, **managed policy** (shipped in v1.3.0), "always on" lock, compliance report export, priority support, security review pack. |
+| **Free** | $0 | Everything above, for anyone. Open source. |
+| **Team** | $4–6 per user per month | Maintained policy packs per profession (legal, healthcare, finance), a signed policy so members cannot weaken it, an evidence report for client and auditor questionnaires. |
+| **Enterprise** | Annual | Force-install and managed policy (shipped), priority fixes, a security review pack. |
 
-**The clever part — licensing with zero network calls.** Enterprise features can
-be unlocked by a *signed license* pushed through Chrome managed storage, the same
-channel as the managed policy. The extension embeds a public key and verifies
-the signature offline (Ed25519 via WebCrypto). No licence server, no phone-home,
-and the no-network promise stays intact. This is the feature to build
-next if the business model is validated.
+Paid features unlock with a **signed licence file verified offline**, delivered
+the same way as the policy. No licence server, so the no-network promise holds.
+This is not built yet and should not be built until five teams are using the
+free version.
 
-## 4. Distribution (first-principles)
+Realistic expectation: free tools in this category earn little directly. The
+free tier exists to earn installs and credibility; revenue, if any, comes from
+teams that need evidence for someone else (a client, an insurer, a regulator).
 
-Ranked by leverage, cheapest first:
+## 6. Distribution, cheapest first
 
-1. **Chrome Web Store** — the consumer funnel and the credibility badge.
-2. **Microsoft Edge Add-ons** — same Manifest V3 code, near-zero porting cost,
-   and Edge users are exactly the Microsoft 365 / Copilot companies that buy DLP.
-3. **Chrome Enterprise / Google Admin force-install** — this is where contracts
-   come from. The managed-policy schema added in v1.3.0 is the prerequisite.
-4. **Firefox Add-ons** — MV3 is supported; small API differences.
+1. **Developers.** The CLI and hook install from GitHub in one command, and a
+   committed policy file spreads the tool through a team by itself.
+2. **Chrome Web Store**, then **Edge Add-ons** (same code; Edge shops are the
+   Microsoft 365 firms in the target segment).
+3. **Professional communities**: a short, specific guide per profession ("using
+   ChatGPT at a law firm without breaching privilege") beats generic marketing.
+4. **Design partners**: five named teams using it free in return for feedback
+   and, if they agree, a public quote. Logos are the trust signal this project
+   lacks most.
 
-Motion: **bottom-up then top-down.** Individuals install it free → it catches
-something real → they forward it to IT → IT standardises with the managed policy.
+## 7. Trust, earned not claimed
 
-## 5. Trust stack — what to do before asking for money
-
-| Step | Why | Cost |
-| --- | --- | --- |
-| Keep the core open source | Anyone can verify the privacy claim | done |
-| `SECURITY.md` + private vulnerability reporting | Expected by every security buyer | done (enable reporting in repo settings) |
-| CodeQL, SHA-pinned CI, Dependabot | Supply-chain hygiene | done |
-| Reproducible builds + published checksums | Prove the store package = the source | checksums done |
-| Independent penetration test | The single most persuasive document for a CISO | paid, later |
-| SOC 2 | Only needed once there is a backend; today there is no data to certify | defer |
-
-## 6. Measuring success without telemetry
-
-The product promises no tracking, so it cannot phone home — and must not start.
-Measure through channels that respect that:
-
-- **Store dashboard:** installs, weekly users, uninstalls, ratings, reviews.
-- **Enterprise customers:** they export the local, content-free activity CSV
-  themselves — their evidence for auditors, our proof of value.
-- **Opt-in feedback:** a "was this flag useful?" link to a survey, never automatic.
-
-North-star metric: **sensitive items caught and redacted per active user per
-week** (reported by customers from their own logs).
-
-## 7. Risks, honestly
-
-| Risk | Mitigation |
+| Step | Status |
 | --- | --- |
-| AI vendors add native PII warnings | Be cross-platform (13+ sites), org-policy-driven and vendor-neutral — a vendor cannot police its competitors' sites. |
-| False positives annoy users into uninstalling | Precision is a first-class metric; the 45-prompt benign corpus must stay at 0 false positives. |
-| Store policy or review changes | Minimal permissions, clear single purpose, honest listing. |
-| Trademark complaints over naming AI products | Describe compatibility ("works with ChatGPT…"), never imply affiliation. |
-| A security flaw in a privacy product | Regression-tested guarantees (`tests/security.js`), disclosure policy, fast patch cadence. |
+| Open source core | Done |
+| CI check that shipped code has no network calls | Done |
+| Reproducible extension build with a published hash | Done in v1.4.0 |
+| Signed build provenance (anyone can verify the zip came from this repo's CI) | Done in v1.4.0 |
+| Security policy, code scanning, pinned CI actions | Done |
+| Published detection benchmark others can run | Partly: the corpus is public but small and self-written |
+| Independent security review | Not done; the most persuasive document for a buyer |
+| Named users | None yet |
 
-## 8. 30 / 60 / 90 days
+## 8. Weaknesses to be straight about
 
-- **30:** Store approval. Edge Add-ons listing. Five design-partner companies
-  using the managed policy for free in exchange for feedback.
-- **60:** Signed offline licence + Team tier. Compliance report export.
-- **90:** First paid enterprise pilot. Independent penetration test. Firefox.
+- **Detection is rules, not a model.** Several competitors run on-device
+  language models. Rules are fast and explainable and will miss free-text
+  disclosures a model would catch.
+- **The accuracy numbers are self-graded.** 36 risky cases and 114 ordinary
+  prompts, all written by this project. Before v1.4.0 the engine flagged the
+  word "add" as a health condition and about one in three everyday prompts
+  raised a false warning; the earlier corpus was too easy to notice. Expect
+  more of these in real use.
+- **The extension has not been exercised on the live AI sites**, only on a
+  local mock page.
+- **No restore in the browser yet**; competitors have it.
+- **The coding-agent hook cannot rewrite a prompt or see @-mentioned files.**
+  That is a platform limit shared by every such hook.
+- **Zero users.** Everything in section 5 is untested.
+
+## 9. Next 30 / 60 / 90 days
+
+- **30:** Store approval. Real-site test pass on each supported AI site. Edge
+  listing. Restore in the extension. First two design-partner teams.
+- **60:** Policy packs for two professions. Evidence report. Five design partners.
+- **90:** Decide, from what those five teams actually use, whether a paid Team
+  tier is worth building. If not, keep it as a free open-source tool and stop.

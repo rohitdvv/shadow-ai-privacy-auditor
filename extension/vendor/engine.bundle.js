@@ -453,6 +453,25 @@
     'std','sti','chlamydia','gonorrhea','syphilis','herpes','hpv',
   ];
 
+  /**
+   * Health terms that are also everyday English or technical vocabulary:
+   * "add a button", "std::vector", "SVG stroke", "visual aids", "blind index".
+   * On their own they say nothing about anyone's health, so the condition rule
+   * only reports them with supporting evidence (see medical_condition in
+   * patterns.js). Unambiguous terms such as "diabetes" are not listed here.
+   */
+  const AMBIGUOUS_MEDICAL = {
+    /** Reported only when written in capitals AND next to clinical vocabulary. */
+    acronymNeedsContext: set(['add', 'std', 'sti', 'ocd']),
+    /** Reported only when written in capitals ("AIDS", never "visual aids"). */
+    acronymOnly: set(['aids']),
+    /** Reported only next to clinical vocabulary or tied to a person ("she had a stroke"). */
+    wordNeedsLink: set([
+      'blind', 'deaf', 'stroke', 'depression', 'transplant', 'detox', 'rehab', 'disability',
+      'addiction', 'cataract', 'anxiety disorder', 'chronic pain', 'migraine', 'pregnancy',
+    ]),
+  };
+
   /** Prescription and controlled drugs commonly named in notes. */
   const MEDICATIONS = [
     'metformin','insulin','lisinopril','amlodipine','atorvastatin','simvastatin','losartan','metoprolol',
@@ -571,6 +590,69 @@
 
   function rule(def) {
     return { group: 0, confidence: 0.8, ...def };
+  }
+
+  /**
+   * Whole-word cue test. A plain substring test finds "er" (emergency room) in
+   * "Carter" and "call" in "locally", which turned ordinary text into
+   * "supporting context". A trailing plural is allowed.
+   */
+  const cueCache = new Map();
+  function hasCue(text, cue) {
+    let re = cueCache.get(cue);
+    if (!re) {
+      re = new RegExp(`(?<![a-z0-9])${esc(cue.toLowerCase())}(?:s|es)?(?![a-z0-9])`);
+      cueCache.set(cue, re);
+    }
+    return re.test(text);
+  }
+
+  /** The condition is stated about someone: "she had a stroke", "my disability", "diagnosed with depression". */
+  const HEALTH_LINK_BEFORE = new RegExp(
+    '(?:' +
+      '\\b(?:i|he|she|they|we|who|patient|client|employee|mother|father|mom|mum|dad|son|daughter|wife|husband|brother|sister|child)' +
+        "(?:\\s+(?:has|have|had|is|am|are|was|were|suffers?|suffered|experienced|developed|got)|'s|'m|’s|’m)" +
+      '|\\b(?:disclosed|reported|declared|mentioned|revealed|diagnosed with|diagnosis of|history of|suffer(?:s|ed|ing)? from|recovering from|treated for|treatment for|living with|in|into|to|from)' +
+      '|\\b(?:my|his|her|their|our)' +
+    ')\\s+(?:(?:an?|the|from|with|legally|severe|chronic|clinical|major|mild|postpartum|early|late|second|first|recent)\\s+){0,3}$',
+    'i',
+  );
+  /** Bare prepositions only count for places of care: "in rehab", "went to detox". */
+  const PLACE_OF_CARE = new Set(['rehab', 'detox']);
+  const BARE_PREPOSITION = /\b(?:in|into|to|from)\s+$/i;
+
+  /** Idioms and terms of art that reuse a health word: "blind to", "stroke width", "depression-era". */
+  const HEALTH_IDIOM_AFTER = {
+    blind: /^\s+(?:to|spot|spots|index|copy|test|tests|testing|study|trial|date|faith|carbon)\b/i,
+    deaf: /^\s+(?:to|ear|ears)\b/i,
+    stroke: /^\s+(?:order|width|colou?r|of|style|line|linecap|dasharray|play)\b/i,
+    depression: /^(?:\s+era\b|-era\b)/i,
+    transplant: /^\s+shock\b/i,
+  };
+  /** Code-shaped continuations: stroke-width, stroke: red, add(1, 2). */
+  const CODE_AFTER = /^[-:(=]/;
+
+  /**
+   * Should an ambiguous health term ("add", "stroke", "blind"…) be reported?
+   * @param {string} value   the matched text, original case
+   * @param {string} before  up to 60 characters before the match
+   * @param {string} after   up to 20 characters after the match
+   * @param {string} context the rule's context window, lower-cased
+   */
+  function ambiguousMedicalHasEvidence(value, before, after, context) {
+    const term = value.toLowerCase();
+    const isUpper = value === value.toUpperCase();
+    const clinical = MEDICAL_CONTEXT.some((cue) => hasCue(context, cue));
+
+    if (AMBIGUOUS_MEDICAL.acronymOnly.has(term)) return isUpper;
+    if (AMBIGUOUS_MEDICAL.acronymNeedsContext.has(term)) return isUpper && clinical;
+    if (AMBIGUOUS_MEDICAL.wordNeedsLink.has(term)) {
+      if (CODE_AFTER.test(after) || (HEALTH_IDIOM_AFTER[term] && HEALTH_IDIOM_AFTER[term].test(after))) return false;
+      if (clinical) return true;
+      if (!HEALTH_LINK_BEFORE.test(before)) return false;
+      return PLACE_OF_CARE.has(term) || !BARE_PREPOSITION.test(before);
+    }
+    return true;
   }
 
   /* ------------------------------------------------------------------ */
@@ -1049,8 +1131,12 @@
       title: 'Health condition', confidence: 0.78,
       regex: new RegExp(`\\b(?:${alt(MEDICAL_CONDITIONS)})\\b`, 'gi'),
       why: 'Health status is special-category data under GDPR Art. 9. Attaching it to any identifier creates a disclosable health record.',
-      validate: (v, m) => {
+      validate: (v, m, body) => {
         const ctx = (m.context || '').toLowerCase();
+        // Words that are also plain English or code ("add", "std", "stroke") need evidence.
+        const before = body.slice(Math.max(0, m.index - 60), m.index);
+        const after = body.slice(m.index + v.length, m.index + v.length + 20);
+        if (!ambiguousMedicalHasEvidence(v, before, after, ctx)) return false;
         // Generic/educational usage ("what is diabetes?") is not a disclosure.
         if (/\b(?:what is|what are|define|definition of|explain|symptoms of|causes of|how does|research on|article about|statistics on)\b/.test(ctx)) {
           return { severity: S.LOW, confidence: 0.3, note: 'Appears to be a general question, not a patient disclosure' };
@@ -1321,6 +1407,17 @@
     'findings','conclusion','recommendation','recommendations','appendix','reference','references','glossary',
     'risk','risks','issue','issues','action','actions','decision','decisions','next','steps','owner','status',
     'phase','stage','sprint','iteration','release','version','build','environment','production','staging',
+    // product, interface and engineering vocabulary that is routinely title-cased
+    'settings','page','pages','save','changes','change','log','pull','request','requests','merge','commit',
+    'server','client','gateway','payment','payments','checkout','button','menu','tab','panel','dialog','modal',
+    'form','field','table','column','row','index','query','database','cache','queue','worker','runner','job',
+    'pipeline','workflow','action','deploy','deployment','docker','compose','express','http','https','api',
+    'app','application','router','component','module','class','function','method','service','controller',
+    'series','round','seed','review','reviews','score','promoter','net','gross','margin','order','quantity',
+    'terms','privacy','source','open','time','black','golden','gate','bridge','pro','air','mini','max','plus',
+    'studio','code','visual','null','pointer','error','exception','test','tests','user','users','admin',
+    'address','speech','act','award','prize','cup','league','university','college','school','hospital',
+    'mode','strict','safe','dark','light','debug','demo','day','board','team','list','load','more',
     // frequently capitalised misc
     'internet','email','online','offline','remote','hybrid','office','headquarters','campus','building','room',
     'north','south','east','west','street','avenue','road','city','town','county','state','province','country',
@@ -1387,11 +1484,15 @@
     return text.slice(Math.max(0, start - radius), Math.min(text.length, end + radius)).toLowerCase();
   }
 
-  function hasPersonCue(text, start, end) {
+  /** Possessives sit near almost anything ("my React component"), so they only support a known first name. */
+  const WEAK_PERSON_CUES = setOf(['my', 'our', 'his', 'her', 'their']);
+
+  function hasPersonCue(text, start, end, strongOnly = false) {
     const before = text.slice(Math.max(0, start - 45), start).toLowerCase();
     const after = text.slice(end, Math.min(text.length, end + 35)).toLowerCase();
     const window = before + ' \u0000 ' + after;
     return PERSON_CONTEXT_CUES.some((cue) => {
+      if (strongOnly && WEAK_PERSON_CUES.has(cue)) return false;
       if (cue.includes(' ')) return window.includes(cue);
       return new RegExp(`\\b${cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(window);
     });
@@ -1412,6 +1513,11 @@
       // Grow a maximal run of capitalised tokens (particles allowed in the middle).
       let j = i;
       while (j + 1 < tokens.length) {
+        // A full stop ends the sentence, and a name never spans two sentences:
+        // "…the Pull Request. Ask John Carter" is not one five-word name. Initials
+        // ("J.") and titles ("Dr.") keep their full stop and carry on.
+        const cur = tokens[j];
+        if (cur.raw.endsWith('.') && cur.lower.length > 1 && !HONORIFICS.has(cur.lower)) break;
         const gap = text.slice(tokens[j].end, tokens[j + 1].start);
         if (!/^[ \t]*[-'’]?[ \t]*$/.test(gap) || gap.length > 2) break;
         const next = tokens[j + 1];
@@ -1424,7 +1530,10 @@
       let run = tokens.slice(i, j + 1);
       while (run.length > 1 && LEADING_NON_NAME.has(run[0].lower)) run = run.slice(1);
       const start = run[0].start;
-      const end = run[run.length - 1].end;
+      // The tokenizer keeps a trailing full stop for initials ("J.") and titles.
+      // On a longer last word it is the end of the sentence, not part of the name.
+      const last = run[run.length - 1];
+      const end = last.raw.endsWith('.') && last.raw.length > 2 ? last.end - 1 : last.end;
       const value = text.slice(start, end);
       const words = run.map((t) => t.lower);
 
@@ -1445,9 +1554,12 @@
     if (words.every((w) => PLACE_NAMES.has(w))) return null;
     if (run.every((t) => t.allCaps) && !words.some((w) => GIVEN_NAMES.has(w))) return null; // acronyms
     if (value.length < 3) return null;
+    // "Big O", "Plan B", "Series A": a bare single letter is a label, not a surname (an initial is "J.").
+    if (run.some((t) => t.raw.length === 1) && !words.some((w) => GIVEN_NAMES.has(w))) return null;
 
     const prevWord = previousWord(text, start);
-    const hasHonorific = prevWord && HONORIFICS.has(lc(prevWord));
+    // The title can sit just before the run ("Dr Okafor" after a lower-case word) or open it ("Mr. Okafor").
+    const hasHonorific = Boolean(prevWord && HONORIFICS.has(lc(prevWord))) || (words.length > 1 && HONORIFICS.has(words[0]));
     const hasGazetteerHit = words.some((w) => GIVEN_NAMES.has(w));
     // "Roth IRA", "Project ALPHA", "Amazon AWS" — an embedded acronym means this is a
     // term of art, not a person, unless a first name or honorific says otherwise.
@@ -1481,7 +1593,7 @@
     const prevToken = prevWord;
     const honorific = hasHonorific;
     const gazetteerHit = hasGazetteerHit;
-    const cue = hasPersonCue(text, start, end);
+    const cue = hasPersonCue(text, start, end, !hasGazetteerHit && !hasHonorific);
     const sentenceInitial = isSentenceInitial(text, run[0]);
     const multiWord = run.filter((t) => t.cap).length >= 2;
     const containsNonName = words.some((w) => NON_NAME_WORDS.has(w) || PLACE_NAMES.has(w));
@@ -1489,16 +1601,20 @@
     let score = 0;
     if (multiWord) { score += 0.5; signals.push('two or more capitalised words'); }
     if (gazetteerHit) { score += 0.3; signals.push('matches a common given name'); }
-    if (honorific) { score += 0.45; signals.push(`preceded by honorific "${prevToken}"`); }
+    if (honorific) { score += 0.55; signals.push(`preceded by honorific "${prevToken}"`); }
     if (cue) { score += 0.25; signals.push('appears next to a person-role cue'); }
     if (!multiWord && !gazetteerHit && !honorific) return null;
     if (!multiWord && sentenceInitial && !honorific) return null;
     if (sentenceInitial && !gazetteerHit && !honorific && !cue) score -= 0.2;
     if (containsNonName && !gazetteerHit && !honorific) score -= 0.35;
+    // Capital letters alone are weak evidence: "Golden Gate Bridge", "Pull Request"
+    // and "Save Changes" look exactly like a name. Without a known first name, a
+    // title or a person cue, stay below the default reporting threshold.
+    if (multiWord && !gazetteerHit && !honorific && !cue) { score -= 0.2; signals.push('capitalisation is the only evidence'); }
     if (/'s$|’s$/.test(value)) score += 0.05;
 
     // Possessive/plural stripping for the reported value.
-    if (score < 0.5) return null;
+    if (score < 0.3) return null;
 
     const severity = score >= 0.75 ? S.HIGH : S.MEDIUM;
 
@@ -1607,7 +1723,7 @@
     let confidence = finding.confidence;
 
     const cues = CATEGORY_CONTEXT_CUES[finding.category] || [];
-    const hits = cues.filter((c) => ctx.includes(c.toLowerCase()));
+    const hits = cues.filter((c) => hasCue(ctx, c));
     if (hits.length) {
       confidence += Math.min(0.15, 0.05 * hits.length);
       signals.push(`supporting context: ${hits.slice(0, 3).join(', ')}`);

@@ -107,7 +107,7 @@ few days. You'll get an email when it's published.
    codename) and the specific issue. Fix exactly that.
 2. Open the item → **Package** → **Upload new package** with the new zip. The
    manifest `version` must be higher than any package previously uploaded
-   (v1.3.0 here).
+   (v1.4.0 here).
 3. Re-check every tab — Store listing, Privacy practices, Distribution — then
    **Submit for review** again. There is no charge for resubmitting.
 

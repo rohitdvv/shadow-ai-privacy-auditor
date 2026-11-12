@@ -294,6 +294,9 @@ a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset:
 .pane-head.sub { margin-top: 1.2rem; }
 .pane-head h2 { font-size: .96rem; display: inline-flex; align-items: center; gap: .5rem; }
 .pane-head-actions { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+/* A long option label must not push the page wider than a phone screen. */
+.pane-head-actions { min-width: 0; max-width: 100%; }
+.pane-head-actions .select { min-width: 0; max-width: 100%; }
 
 .step-num {
   display: inline-grid; place-items: center; width: 1.35rem; height: 1.35rem;
@@ -635,13 +638,40 @@ kbd {
 
 /* ---------------------------------------------------------------- footer */
 
+/* ---- Why this one ------------------------------------------------------ */
+.why { padding: 3rem 1.4rem 2.5rem; border-top: 1px solid var(--border); background: var(--surface); }
+.why-inner { max-width: 1500px; margin: 0 auto; }
+.why h2 { font-size: clamp(1.35rem, 2.6vw, 1.8rem); }
+.why-lede { max-width: 62ch; margin: .6rem 0 1.6rem; color: var(--text-muted); }
+.why-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.why-card { padding: 1.15rem 1.2rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.why-card h3 { font-size: 1rem; margin-bottom: .45rem; }
+.why-card p { margin: 0 0 .6rem; font-size: .9rem; }
+.why-card .code-block { margin: .2rem 0 0; }
+.why-card .code-block code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.why-card code { font-family: var(--mono); font-size: .82em; }
+.why-meta { color: var(--text-muted); font-size: .78rem !important; margin-bottom: 0 !important; }
+.why-table-wrap { margin-top: 1.6rem; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.why-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .88rem; }
+.why-table caption { caption-side: top; text-align: left; padding: .8rem 1rem; font-weight: 650; }
+.why-table th, .why-table td { padding: .6rem 1rem; text-align: left; border-top: 1px solid var(--border); vertical-align: top; }
+.why-table thead th { color: var(--text-muted); font-weight: 600; font-size: .8rem; }
+.why-table tbody th { font-weight: 600; white-space: nowrap; }
+.why-table td:last-child, .why-table thead th:last-child { background: var(--accent-soft); font-weight: 600; }
+.why-verify { margin-top: 1.6rem; padding: 1.15rem 1.2rem; border: 1px solid var(--border); border-radius: var(--radius); }
+.why-verify h3 { font-size: 1rem; margin-bottom: .5rem; }
+.why-verify ul { margin: 0; padding-left: 1.1rem; font-size: .9rem; }
+.why-verify li + li { margin-top: .4rem; }
+.why-verify code { font-family: var(--mono); font-size: .8em; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .why-grid { grid-template-columns: minmax(0, 1fr); } }
+
 .footer {
   max-width: 1500px; margin: 0 auto; padding: 1.4rem 1.4rem 3rem;
   font-size: .82rem; color: var(--text-muted);
   display: flex; flex-direction: column; gap: .6rem;
   border-top: 1px solid var(--border);
 }
-.footer-links { display: flex; gap: .6rem; align-items: center; font-weight: 600; }
+.footer-links { display: flex; flex-wrap: wrap; gap: .3rem .6rem; align-items: center; font-weight: 600; }
 
 /* ---------------------------------------------------------------- toast */
 

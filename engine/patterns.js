@@ -23,7 +23,7 @@ import {
 } from './validators.js';
 import {
   MEDICAL_CONDITIONS, MEDICATIONS, MEDICAL_CONTEXT, IMMIGRATION_TERMS,
-  PROTECTED_ATTRIBUTES, CONFIDENTIALITY_MARKERS, BUSINESS_SENSITIVE, COMMON_WORDS,
+  PROTECTED_ATTRIBUTES, CONFIDENTIALITY_MARKERS, BUSINESS_SENSITIVE, COMMON_WORDS, AMBIGUOUS_MEDICAL,
 } from './gazetteers.js';
 
 export const CONTEXT_WINDOW = 80;
@@ -35,6 +35,69 @@ const alt = (list) =>
 
 function rule(def) {
   return { group: 0, confidence: 0.8, ...def };
+}
+
+/**
+ * Whole-word cue test. A plain substring test finds "er" (emergency room) in
+ * "Carter" and "call" in "locally", which turned ordinary text into
+ * "supporting context". A trailing plural is allowed.
+ */
+const cueCache = new Map();
+export function hasCue(text, cue) {
+  let re = cueCache.get(cue);
+  if (!re) {
+    re = new RegExp(`(?<![a-z0-9])${esc(cue.toLowerCase())}(?:s|es)?(?![a-z0-9])`);
+    cueCache.set(cue, re);
+  }
+  return re.test(text);
+}
+
+/** The condition is stated about someone: "she had a stroke", "my disability", "diagnosed with depression". */
+const HEALTH_LINK_BEFORE = new RegExp(
+  '(?:' +
+    '\\b(?:i|he|she|they|we|who|patient|client|employee|mother|father|mom|mum|dad|son|daughter|wife|husband|brother|sister|child)' +
+      "(?:\\s+(?:has|have|had|is|am|are|was|were|suffers?|suffered|experienced|developed|got)|'s|'m|’s|’m)" +
+    '|\\b(?:disclosed|reported|declared|mentioned|revealed|diagnosed with|diagnosis of|history of|suffer(?:s|ed|ing)? from|recovering from|treated for|treatment for|living with|in|into|to|from)' +
+    '|\\b(?:my|his|her|their|our)' +
+  ')\\s+(?:(?:an?|the|from|with|legally|severe|chronic|clinical|major|mild|postpartum|early|late|second|first|recent)\\s+){0,3}$',
+  'i',
+);
+/** Bare prepositions only count for places of care: "in rehab", "went to detox". */
+const PLACE_OF_CARE = new Set(['rehab', 'detox']);
+const BARE_PREPOSITION = /\b(?:in|into|to|from)\s+$/i;
+
+/** Idioms and terms of art that reuse a health word: "blind to", "stroke width", "depression-era". */
+const HEALTH_IDIOM_AFTER = {
+  blind: /^\s+(?:to|spot|spots|index|copy|test|tests|testing|study|trial|date|faith|carbon)\b/i,
+  deaf: /^\s+(?:to|ear|ears)\b/i,
+  stroke: /^\s+(?:order|width|colou?r|of|style|line|linecap|dasharray|play)\b/i,
+  depression: /^(?:\s+era\b|-era\b)/i,
+  transplant: /^\s+shock\b/i,
+};
+/** Code-shaped continuations: stroke-width, stroke: red, add(1, 2). */
+const CODE_AFTER = /^[-:(=]/;
+
+/**
+ * Should an ambiguous health term ("add", "stroke", "blind"…) be reported?
+ * @param {string} value   the matched text, original case
+ * @param {string} before  up to 60 characters before the match
+ * @param {string} after   up to 20 characters after the match
+ * @param {string} context the rule's context window, lower-cased
+ */
+export function ambiguousMedicalHasEvidence(value, before, after, context) {
+  const term = value.toLowerCase();
+  const isUpper = value === value.toUpperCase();
+  const clinical = MEDICAL_CONTEXT.some((cue) => hasCue(context, cue));
+
+  if (AMBIGUOUS_MEDICAL.acronymOnly.has(term)) return isUpper;
+  if (AMBIGUOUS_MEDICAL.acronymNeedsContext.has(term)) return isUpper && clinical;
+  if (AMBIGUOUS_MEDICAL.wordNeedsLink.has(term)) {
+    if (CODE_AFTER.test(after) || (HEALTH_IDIOM_AFTER[term] && HEALTH_IDIOM_AFTER[term].test(after))) return false;
+    if (clinical) return true;
+    if (!HEALTH_LINK_BEFORE.test(before)) return false;
+    return PLACE_OF_CARE.has(term) || !BARE_PREPOSITION.test(before);
+  }
+  return true;
 }
 
 /* ------------------------------------------------------------------ */
@@ -513,8 +576,12 @@ const MEDICAL_RULES = [
     title: 'Health condition', confidence: 0.78,
     regex: new RegExp(`\\b(?:${alt(MEDICAL_CONDITIONS)})\\b`, 'gi'),
     why: 'Health status is special-category data under GDPR Art. 9. Attaching it to any identifier creates a disclosable health record.',
-    validate: (v, m) => {
+    validate: (v, m, body) => {
       const ctx = (m.context || '').toLowerCase();
+      // Words that are also plain English or code ("add", "std", "stroke") need evidence.
+      const before = body.slice(Math.max(0, m.index - 60), m.index);
+      const after = body.slice(m.index + v.length, m.index + v.length + 20);
+      if (!ambiguousMedicalHasEvidence(v, before, after, ctx)) return false;
       // Generic/educational usage ("what is diabetes?") is not a disclosure.
       if (/\b(?:what is|what are|define|definition of|explain|symptoms of|causes of|how does|research on|article about|statistics on)\b/.test(ctx)) {
         return { severity: S.LOW, confidence: 0.3, note: 'Appears to be a general question, not a patient disclosure' };
